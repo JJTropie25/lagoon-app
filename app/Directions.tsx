@@ -37,42 +37,21 @@ const cityCoords: Record<string, { lat: number; lon: number }> = {
   "Verona, VR": { lat: 45.4384, lon: 10.9916 },
 };
 
-const directionsKey =
-  process.env.EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY?.trim() ??
-  process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY?.trim() ??
-  "";
-
 type LatLng = { latitude: number; longitude: number };
 
-function decodePolyline(encoded: string): LatLng[] {
-  let index = 0;
-  const len = encoded.length;
-  let lat = 0;
-  let lng = 0;
-  const coordinates: LatLng[] = [];
-  while (index < len) {
-    let b = 0;
-    let shift = 0;
-    let result = 0;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    const dlat = (result & 1) ? ~(result >> 1) : result >> 1;
-    lat += dlat;
-    shift = 0;
-    result = 0;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    const dlng = (result & 1) ? ~(result >> 1) : result >> 1;
-    lng += dlng;
-    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
-  }
-  return coordinates;
+async function fetchOsrmRoute(origin: LatLng, dest: LatLng): Promise<LatLng[]> {
+  const url =
+    `https://router.project-osrm.org/route/v1/foot/` +
+    `${origin.longitude},${origin.latitude};${dest.longitude},${dest.latitude}` +
+    `?overview=full&geometries=geojson`;
+  const res = await fetch(url, { headers: { "User-Agent": "LagoonApp/1.0" } });
+  if (!res.ok) return [origin, dest];
+  const payload = (await res.json()) as {
+    routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+  };
+  const coords = payload.routes?.[0]?.geometry?.coordinates;
+  if (!coords || coords.length < 2) return [origin, dest];
+  return coords.map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
 }
 
 function makeStyles(c: ThemeColors) {
@@ -162,25 +141,10 @@ export default function Directions() {
   useEffect(() => {
     let mounted = true;
     const loadRoute = async () => {
-      if (!origin || !directionsKey) {
-        setRoute(origin ? [origin, destinationCoords] : [destinationCoords]);
-        return;
-      }
-      const url =
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}` +
-        `&destination=${destinationCoords.latitude},${destinationCoords.longitude}` +
-        `&mode=walking&key=${encodeURIComponent(directionsKey)}`;
-      const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-      if (!res.ok) return;
-      const payload = (await res.json()) as {
-        status?: string;
-        routes?: { overview_polyline?: { points?: string } }[];
-      };
+      if (!origin) { setRoute([destinationCoords]); return; }
+      const routeCoords = await fetchOsrmRoute(origin, destinationCoords).catch(() => [origin, destinationCoords]);
       if (!mounted) return;
-      if (payload.status !== "OK") { setRoute([origin, destinationCoords]); return; }
-      const points = payload.routes?.[0]?.overview_polyline?.points;
-      if (!points) { setRoute([origin, destinationCoords]); return; }
-      setRoute(decodePolyline(points));
+      setRoute(routeCoords);
     };
     loadRoute().catch(() => null);
     return () => { mounted = false; };

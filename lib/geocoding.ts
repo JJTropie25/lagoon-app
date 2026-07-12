@@ -1,14 +1,11 @@
-const googleMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-const googleGeocodingKey =
-  process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY?.trim() ?? googleMapsKey;
-const googlePlacesKey =
-  process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY?.trim() ?? googleGeocodingKey;
+// Geocoding via Photon (autocomplete) + Nominatim (fallback + reverse).
+// Zero API keys required.
 
-// Remove leading postal/ZIP codes that Google sometimes prepends (e.g. "86100 Campobasso, ...")
+const USER_AGENT = "LagoonApp/1.0 (com.lagoon.app)";
+
 function cleanLabel(raw: string): string {
   return raw.replace(/^\d{4,7}[\s,]+/, "").trim();
 }
-
 
 export type PlaceSuggestion = {
   label: string;
@@ -16,143 +13,98 @@ export type PlaceSuggestion = {
   longitude: number;
 };
 
-async function googleGeocodeSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
-  if (!googleGeocodingKey) return [];
+// ── Photon (komoot) ───────────────────────────────────────────────────────────
+// Returns coordinates directly — no second "details" call needed.
+async function photonAutocomplete(query: string, limit: number): Promise<PlaceSuggestion[]> {
   const url =
-    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}` +
-    `&key=${encodeURIComponent(googleGeocodingKey)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=it&limit=${limit}`;
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return [];
   const payload = (await res.json()) as {
-    results?: Array<{
-      formatted_address?: string;
-      geometry?: { location?: { lat?: number; lng?: number } };
+    features?: Array<{
+      geometry?: { coordinates?: [number, number] };
+      properties?: {
+        name?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        street?: string;
+        housenumber?: string;
+      };
     }>;
-    status?: string;
-    error_message?: string;
   };
-  if (payload.status && payload.status !== "OK") {
-    console.warn("Google Geocoding status", payload.status, payload.error_message ?? "");
-    return [];
-  }
-  if (!Array.isArray(payload.results)) return [];
-  return payload.results
-    .slice(0, Math.max(1, Math.min(limit, 10)))
-    .map((result) => {
-      const latitude = result.geometry?.location?.lat;
-      const longitude = result.geometry?.location?.lng;
-      const label = cleanLabel(result.formatted_address?.trim() ?? "");
-      if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-      return { label, latitude: latitude as number, longitude: longitude as number } satisfies PlaceSuggestion;
+  if (!Array.isArray(payload.features)) return [];
+  return payload.features
+    .map((f) => {
+      const [lon, lat] = f.geometry?.coordinates ?? [];
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const p = f.properties ?? {};
+      // Build a readable label from the available fields
+      const parts: string[] = [];
+      if (p.name) parts.push(p.name);
+      else if (p.street) parts.push(p.housenumber ? `${p.street} ${p.housenumber}` : p.street);
+      if (p.city && p.city !== p.name) parts.push(p.city);
+      if (p.state) parts.push(p.state);
+      if (p.country) parts.push(p.country);
+      const label = cleanLabel(parts.join(", "));
+      if (!label) return null;
+      return { label, latitude: lat, longitude: lon } satisfies PlaceSuggestion;
     })
     .filter((item): item is PlaceSuggestion => Boolean(item));
 }
 
-async function googlePlacesAutocomplete(
-  query: string,
-  limit: number
-): Promise<PlaceSuggestion[]> {
-  if (!googlePlacesKey) return [];
+// ── Nominatim (OSM) fallback ──────────────────────────────────────────────────
+async function nominatimSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
   const url =
-    `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-      query
-    )}` +
-    `&types=%28cities%29&language=it&key=${encodeURIComponent(googlePlacesKey)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}` +
+    `&format=json&limit=${limit}&accept-language=it&addressdetails=0`;
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return [];
-  const payload = (await res.json()) as {
-    status?: string;
-    error_message?: string;
-    predictions?: Array<{ description?: string; place_id?: string }>;
-  };
-  if (payload.status !== "OK" || !Array.isArray(payload.predictions)) {
-    console.warn("Google Places autocomplete status", payload.status, payload.error_message ?? "");
-    return [];
-  }
-
-  const sliced = payload.predictions.slice(0, Math.max(1, Math.min(limit, 10)));
-  const details = await Promise.all(
-    sliced.map(async (prediction) => {
-      if (!prediction.place_id) return null;
-      const detailsUrl =
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
-          prediction.place_id
-        )}` +
-        `&fields=formatted_address,geometry&key=${encodeURIComponent(googlePlacesKey)}`;
-      const detailsRes = await fetch(detailsUrl, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-      if (!detailsRes.ok) return null;
-      const detailsPayload = (await detailsRes.json()) as {
-        status?: string;
-        error_message?: string;
-        result?: {
-          formatted_address?: string;
-          geometry?: { location?: { lat?: number; lng?: number } };
-        };
-      };
-      if (detailsPayload.status !== "OK") {
-        console.warn("Google Places details status", detailsPayload.status, detailsPayload.error_message ?? "");
-        return null;
-      }
-      const label =
-        prediction.description?.trim() ??
-        detailsPayload.result?.formatted_address?.trim();
-      const latitude = detailsPayload.result?.geometry?.location?.lat;
-      const longitude = detailsPayload.result?.geometry?.location?.lng;
-      if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-      return { label, latitude: latitude as number, longitude: longitude as number } satisfies PlaceSuggestion;
+  const payload = (await res.json()) as Array<{
+    display_name?: string;
+    lat?: string;
+    lon?: string;
+  }>;
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item) => {
+      const lat = Number(item.lat);
+      const lon = Number(item.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const label = cleanLabel(item.display_name?.trim() ?? "");
+      if (!label) return null;
+      return { label, latitude: lat, longitude: lon } satisfies PlaceSuggestion;
     })
-  );
-
-  return details.filter((item): item is PlaceSuggestion => Boolean(item));
+    .filter((item): item is PlaceSuggestion => Boolean(item));
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
 export async function searchPlaceSuggestions(query: string, limit = 6): Promise<PlaceSuggestion[]> {
   const normalized = query.trim();
   if (normalized.length < 1) return [];
   try {
-    const results = await googlePlacesAutocomplete(normalized, limit);
+    const results = await photonAutocomplete(normalized, limit);
     if (results.length > 0) return results;
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   try {
-    const results = await googleGeocodeSearch(normalized, limit);
+    const results = await nominatimSearch(normalized, limit);
     if (results.length > 0) return results;
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   return [];
 }
 
-async function googleReverse(latitude: number, longitude: number): Promise<string | null> {
-  if (!googleGeocodingKey) return null;
-  const url =
-    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(
-      String(latitude)
-    )},${encodeURIComponent(String(longitude))}` +
-    `&key=${encodeURIComponent(googleGeocodingKey)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
-  const payload = (await res.json()) as {
-    results?: Array<{ formatted_address?: string }>;
-    status?: string;
-    error_message?: string;
-  };
-  if (payload.status && payload.status !== "OK") {
-    console.warn("Google reverse geocoding status", payload.status, payload.error_message ?? "");
-  }
-  return payload.results?.[0]?.formatted_address?.trim() || null;
-}
-
+// ── Reverse geocoding ─────────────────────────────────────────────────────────
 export async function reverseGeocodeLabel(latitude: number, longitude: number): Promise<string> {
   try {
-    const label = await googleReverse(latitude, longitude);
-    if (label) return label;
-  } catch {
-    // ignore
-  }
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}` +
+      `&format=json&accept-language=it`;
+    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    if (res.ok) {
+      const payload = (await res.json()) as { display_name?: string };
+      const label = payload.display_name?.trim();
+      if (label) return cleanLabel(label);
+    }
+  } catch { /* ignore */ }
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }
