@@ -1,6 +1,6 @@
 -- Massive mock dataset:
--- 10 services per category (rest, shower, storage) for each Italian regional capital (20 cities).
--- Total rows inserted: 600.
+-- 10 services per category (rest, shower, storage, focus, tavolo, charge) for each Italian regional capital (20 cities).
+-- Total rows inserted: 1200.
 
 with capoluoghi(city, province, region, latitude, longitude) as (
   values
@@ -29,7 +29,10 @@ categories(category, label_it, base_price, category_bias) as (
   values
     ('rest', 'Riposo', 17, 0),
     ('shower', 'Doccia', 7, 1),
-    ('storage', 'Deposito', 6, 2)
+    ('storage', 'Deposito', 6, 2),
+    ('focus', 'Focus', 10, 3),
+    ('tavolo', 'Tavolo', 8, 4),
+    ('charge', 'Ricarica', 4, 5)
 ),
 generated as (
   select
@@ -58,7 +61,8 @@ insert into public.services (
   longitude,
   rating,
   distance_meters,
-  section
+  section,
+  image_url
 )
 select
   concat(label_it, ' ', city, ' ', lpad(ordinal::text, 2, '0')) as title,
@@ -69,10 +73,12 @@ select
   region,
   (latitude + ((ordinal - 5.5) * 0.0015))::double precision as latitude,
   (longitude + ((ordinal - 5.5) * 0.0015))::double precision as longitude,
-  least(5.0, 3.8 + ((ordinal % 7) * 0.2) + (case when category = 'rest' then 0.2 else 0 end))::numeric(2,1) as rating,
+  least(5.0, 3.8 + ((ordinal % 7) * 0.2) + (case when category = 'rest' then 0.2 else 0 end))::numeric(3,1) as rating,
   (150 + ordinal * 95 + category_bias * 40)::int as distance_meters,
   case
     when ordinal <= 2 then 'recently'
     when ordinal <= 4 then 'around'
     else null
-  end as section;
+  end as section,
+  '["https://picsum.photos/seed/' || category || ordinal::text || '/600/400"]' as image_url
+from generated;

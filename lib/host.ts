@@ -115,7 +115,7 @@ type UpdateListingInput = {
   serviceId: string;
   title: string;
   description: string;
-  category: "rest" | "shower" | "storage";
+  category: "rest" | "shower" | "storage" | "focus" | "tavolo" | "charge";
   price_eur: number;
   location: string;
   latitude?: number | null;
@@ -130,7 +130,7 @@ type CreateListingInput = {
   hostId: string;
   title: string;
   description: string;
-  category: "rest" | "shower" | "storage";
+  category: "rest" | "shower" | "storage" | "focus" | "tavolo" | "charge";
   price_eur: number;
   location: string;
   latitude?: number | null;

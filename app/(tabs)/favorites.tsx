@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, FlatList } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import LoadingCard from "../../components/LoadingCard";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -55,7 +56,7 @@ export default function Favorites() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
   const { user } = useAuthState();
@@ -102,6 +103,13 @@ export default function Favorites() {
 
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
       <TabTopNotch />
       <FlatList
           data={items}

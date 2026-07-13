@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import LoadingCard from "../../components/LoadingCard";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -100,7 +101,7 @@ export default function HostListings() {
   const { t } = useI18n();
   const dialog = useAppDialog();
   const { user } = useAuthState();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
 
@@ -139,7 +140,14 @@ export default function HostListings() {
 
   return (
     <View style={styles.screen}>
-      <TabTopNotch />
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
+      <TabTopNotch hostMode />
       <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
@@ -163,7 +171,6 @@ export default function HostListings() {
                   <MaterialCommunityIcons name="plus" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>
-              {hostLabel ? <Text style={styles.hostSubtitle}>{hostLabel}</Text> : null}
             </>
           }
           ListEmptyComponent={

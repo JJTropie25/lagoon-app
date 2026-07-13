@@ -1,4 +1,4 @@
-import { AppState, Pressable, StyleSheet, View } from "react-native";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -12,27 +12,28 @@ import { LagoonLockup } from "./LagoonLockup";
 
 type TabTopNotchProps = {
   hideBell?: boolean;
+  hostMode?: boolean;
+  transparent?: boolean;
 };
 
-function makeStyles(c: ThemeColors, isDark: boolean) {
+function makeStyles(c: ThemeColors, isDark: boolean, transparent: boolean) {
   return StyleSheet.create({
     fixedNotch: {
       position: "absolute",
       left: 0,
       right: 0,
       height: 48,
-      backgroundColor: c.screenBackground,
+      backgroundColor: transparent ? "transparent" : c.screenBackground,
       alignItems: "center",
       flexDirection: "row",
       justifyContent: "flex-start",
       paddingLeft: 14,
       zIndex: 50,
       shadowColor: "#000",
-      shadowOpacity: isDark ? 0 : 0.08,
+      shadowOpacity: transparent ? 0 : (isDark ? 0 : 0.08),
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 3 },
-      elevation: isDark ? 0 : 4,
-      borderBottomWidth: isDark ? 0 : 0,
+      elevation: transparent ? 0 : (isDark ? 0 : 4),
     },
     bellButton: {
       position: "absolute",
@@ -52,16 +53,29 @@ function makeStyles(c: ThemeColors, isDark: boolean) {
       borderRadius: 4,
       backgroundColor: c.warmAccent,
     },
+    hostBadge: {
+      marginLeft: 8,
+      backgroundColor: "#E87722",
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    hostBadgeText: {
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
   });
 }
 
-export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
+export default function TabTopNotch({ hideBell, hostMode, transparent = false }: TabTopNotchProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthState();
   const { colors, mode } = useTheme();
   const isDark = mode === 'dark';
-  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => makeStyles(colors, isDark, transparent), [colors, isDark, transparent]);
   const [unreadCount, setUnreadCount] = useState(0);
   const loadCount = useCallback(async () => {
     if (!supabase || !user?.id) {
@@ -119,6 +133,11 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
   return (
     <View style={[styles.fixedNotch, { top: insets.top }]}>
       <LagoonLockup size={30} onDark={isDark} />
+      {hostMode ? (
+        <View style={styles.hostBadge}>
+          <Text style={styles.hostBadgeText}>Host mode</Text>
+        </View>
+      ) : null}
       {!hideBell ? (
         <Pressable
           style={styles.bellButton}

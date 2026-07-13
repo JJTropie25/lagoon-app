@@ -85,6 +85,10 @@ function makeStyles(c: ThemeColors) {
 export default function TermsAndConditions() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/profile");
+  };
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -96,7 +100,7 @@ export default function TermsAndConditions() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Pressable style={styles.backBtn} onPress={handleBack}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Terms & Conditions</Text>

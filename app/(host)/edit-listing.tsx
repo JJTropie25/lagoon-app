@@ -22,7 +22,7 @@ import {
   fetchServiceSlots,
   updateHostListing,
 } from "../../lib/host";
-import type { ServiceAmenities } from "../../lib/services";
+import { type Service, type ServiceAmenities } from "../../lib/services";
 import { useAppDialog } from "../../components/AppDialogProvider";
 import { useAuthState } from "../../lib/auth";
 import { pickAndUploadListingImage } from "../../lib/listingImage";
@@ -34,14 +34,20 @@ const HEADER_COLOR = "#4F9B9B";
 const IMAGE_HEIGHT = 240;
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 const CATEGORY_ICONS: Record<string, string> = {
-  rest: "bed-king",
-  shower: "shower",
+  rest:    "bed-king",
+  shower:  "shower",
   storage: "locker",
+  focus:   "laptop",
+  tavolo:  "silverware-fork-knife",
+  charge:  "lightning-bolt",
 };
 
 const SLOT_OPTIONS = Array.from({ length: 18 }, (_, i) => {
@@ -50,7 +56,7 @@ const SLOT_OPTIONS = Array.from({ length: 18 }, (_, i) => {
   return `${String(h).padStart(2, "0")}:${m}`;
 });
 
-const CATEGORIES: ("rest" | "shower" | "storage")[] = ["rest", "shower", "storage"];
+const CATEGORIES: Service["category"][] = ["rest", "shower", "storage", "focus", "tavolo", "charge"];
 
 function parsePrice(value: string) {
   const parsed = Number(value.replace(",", ".").trim());
@@ -212,6 +218,7 @@ function makeStyles(c: ThemeColors) {
     },
 
     // Category chips
+    categoryGrid: { gap: 8 },
     categoryRow: {
       flexDirection: "row",
       gap: 8,
@@ -230,6 +237,21 @@ function makeStyles(c: ThemeColors) {
       fontSize: 13,
     },
     categoryChipTextSelected: { color: "#fff" },
+
+    categoryReqBox: {
+      marginTop: 10,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "flex-start",
+    },
+    categoryReqText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 19,
+    },
 
     // Price
     priceRow: {
@@ -312,8 +334,13 @@ function makeStyles(c: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      flex: 1,
+      width: "100%",
     },
+    stepperRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingVertical: 4 },
+    stepperLabel: { color: c.textSecondary, fontWeight: "600", fontSize: 13, flex: 1 },
+    stepper: { flexDirection: "row", alignItems: "center", gap: 4 },
+    stepperBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: c.surfaceSoft, alignItems: "center", justifyContent: "center" },
+    stepperValue: { fontSize: 16, fontWeight: "700", color: c.textPrimary, minWidth: 36, textAlign: "center" },
     dimensionsLabel: {
       color: c.textSecondary,
       fontWeight: "600",
@@ -457,7 +484,7 @@ export default function HostEditListing() {
   const [description, setDescription] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
-  const [category, setCategory] = useState<"rest" | "shower" | "storage">("rest");
+  const [category, setCategory] = useState<Service["category"]>("rest");
   const [price, setPrice] = useState("");
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState("");
@@ -481,6 +508,17 @@ export default function HostEditListing() {
   const [amenBlanket, setAmenBlanket] = useState(false);
   const [amenSofaOrBed, setAmenSofaOrBed] = useState<"sofa" | "bed" | null>(null);
   const [amenToiletAccess, setAmenToiletAccess] = useState(false);
+  // focus
+  const [amenWifi, setAmenWifi] = useState(false);
+  const [amenErgonomicChair, setAmenErgonomicChair] = useState(false);
+  const [amenIsolatedSpace, setAmenIsolatedSpace] = useState(false);
+  const [amenAdjustableLighting, setAmenAdjustableLighting] = useState(false);
+  // tavolo
+  const [amenSeatsCount, setAmenSeatsCount] = useState("");
+  // charge
+  const [amenVoltage, setAmenVoltage] = useState("");
+  const [amenOutletCount, setAmenOutletCount] = useState("");
+  const [amenInternationalPlug, setAmenInternationalPlug] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -522,6 +560,14 @@ export default function HostEditListing() {
       setAmenBlanket(a.blanket ?? false);
       setAmenSofaOrBed(a.sofa_or_bed ?? null);
       setAmenToiletAccess(a.toilet_access ?? false);
+      setAmenWifi(a.wifi ?? false);
+      setAmenErgonomicChair(a.ergonomic_chair ?? false);
+      setAmenIsolatedSpace(a.isolated_space ?? false);
+      setAmenAdjustableLighting(a.adjustable_lighting ?? false);
+      setAmenSeatsCount(a.seats_count != null ? String(a.seats_count) : "");
+      setAmenVoltage(a.voltage != null ? String(a.voltage) : "");
+      setAmenOutletCount(a.outlet_count != null ? String(a.outlet_count) : "");
+      setAmenInternationalPlug(a.international_plug ?? false);
       setLoading(false);
     };
     run();
@@ -570,6 +616,20 @@ export default function HostEditListing() {
     } else if (category === "storage") {
       if (amenDimensions.trim()) a.dimensions = amenDimensions.trim();
       if (amenOpen24h) a.open_24h = true;
+    } else if (category === "focus") {
+      if (amenWifi) a.wifi = true;
+      if (amenErgonomicChair) a.ergonomic_chair = true;
+      if (amenIsolatedSpace) a.isolated_space = true;
+      if (amenAdjustableLighting) a.adjustable_lighting = true;
+    } else if (category === "tavolo") {
+      const seats = parseInt(amenSeatsCount, 10);
+      if (!isNaN(seats) && seats > 0) a.seats_count = seats;
+    } else if (category === "charge") {
+      const volts = parseInt(amenVoltage, 10);
+      const outlets = parseInt(amenOutletCount, 10);
+      if (!isNaN(volts) && volts > 0) a.voltage = volts;
+      if (!isNaN(outlets) && outlets > 0) a.outlet_count = outlets;
+      if (amenInternationalPlug) a.international_plug = true;
     }
     return Object.keys(a).length > 0 ? a : null;
   };
@@ -760,31 +820,47 @@ export default function HostEditListing() {
 
           {/* Category */}
           <Text style={styles.sectionLabel}>{t("host.field.serviceType")}</Text>
-          <View style={styles.categoryRow}>
-            {CATEGORIES.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.categoryChip,
-                  category === item && { backgroundColor: CATEGORY_COLORS[item] },
-                ]}
-                onPress={() => setCategory(item)}
-              >
-                <MaterialCommunityIcons
-                  name={CATEGORY_ICONS[item] as any}
-                  size={20}
-                  color={category === item ? "#fff" : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    category === item && styles.categoryChipTextSelected,
-                  ]}
-                >
-                  {t(`category.${item}`)}
-                </Text>
-              </TouchableOpacity>
+          <View style={styles.categoryGrid}>
+            {[CATEGORIES.slice(0, 3), CATEGORIES.slice(3)].map((row, ri) => (
+              <View key={ri} style={styles.categoryRow}>
+                {row.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.categoryChip,
+                      category === item && { backgroundColor: CATEGORY_COLORS[item] },
+                    ]}
+                    onPress={() => setCategory(item)}
+                  >
+                    <MaterialCommunityIcons
+                      name={CATEGORY_ICONS[item] as any}
+                      size={20}
+                      color={category === item ? "#fff" : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        category === item && styles.categoryChipTextSelected,
+                      ]}
+                    >
+                      {t(`category.${item}`)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             ))}
+          </View>
+
+          <View style={[styles.categoryReqBox, { backgroundColor: CATEGORY_COLORS[category] + "22" }]}>
+            <MaterialCommunityIcons
+              name="information-outline"
+              size={16}
+              color={CATEGORY_COLORS[category]}
+              style={{ marginTop: 1 }}
+            />
+            <Text style={[styles.categoryReqText, { color: CATEGORY_COLORS[category] }]}>
+              {t(`category.req.${category}`)}
+            </Text>
           </View>
 
           <View style={styles.divider} />
@@ -985,6 +1061,77 @@ export default function HostEditListing() {
                     placeholderTextColor={colors.textMuted}
                   />
                 </View>
+              </>
+            )}
+            {category === "focus" && (
+              <>
+                <TouchableOpacity style={[styles.chip, amenWifi && styles.chipSelected]} onPress={() => setAmenWifi((v) => !v)}>
+                  <Text style={[styles.chipText, amenWifi && styles.chipTextSelected]}>{t("amenity.wifi")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.chip, amenErgonomicChair && styles.chipSelected]} onPress={() => setAmenErgonomicChair((v) => !v)}>
+                  <Text style={[styles.chipText, amenErgonomicChair && styles.chipTextSelected]}>{t("amenity.ergonomicChair")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.chip, amenIsolatedSpace && styles.chipSelected]} onPress={() => setAmenIsolatedSpace((v) => !v)}>
+                  <Text style={[styles.chipText, amenIsolatedSpace && styles.chipTextSelected]}>{t("amenity.isolatedSpace")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.chip, amenAdjustableLighting && styles.chipSelected]} onPress={() => setAmenAdjustableLighting((v) => !v)}>
+                  <Text style={[styles.chipText, amenAdjustableLighting && styles.chipTextSelected]}>{t("amenity.adjustableLighting")}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {category === "tavolo" && (
+              <View style={styles.stepperRow}>
+                <Text style={styles.stepperLabel}>{t("host.field.seatsCount")}</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => {
+                      const cur = parseInt(amenSeatsCount, 10) || 0;
+                      setAmenSeatsCount(cur > 1 ? String(cur - 1) : cur === 1 ? "" : "");
+                    }}
+                  >
+                    <MaterialCommunityIcons name="minus" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{amenSeatsCount || "0"}</Text>
+                  <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => {
+                      const cur = parseInt(amenSeatsCount, 10) || 0;
+                      setAmenSeatsCount(String(cur + 1));
+                    }}
+                  >
+                    <MaterialCommunityIcons name="plus" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            {category === "charge" && (
+              <>
+                <View style={styles.dimensionsRow}>
+                  <Text style={styles.dimensionsLabel}>{t("host.field.voltage")}</Text>
+                  <TextInput
+                    style={styles.dimensionsInput}
+                    value={amenVoltage}
+                    onChangeText={setAmenVoltage}
+                    placeholder="es. 220"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                <View style={styles.dimensionsRow}>
+                  <Text style={styles.dimensionsLabel}>{t("host.field.outletCount")}</Text>
+                  <TextInput
+                    style={styles.dimensionsInput}
+                    value={amenOutletCount}
+                    onChangeText={setAmenOutletCount}
+                    placeholder="es. 4"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                <TouchableOpacity style={[styles.chip, amenInternationalPlug && styles.chipSelected]} onPress={() => setAmenInternationalPlug((v) => !v)}>
+                  <Text style={[styles.chipText, amenInternationalPlug && styles.chipTextSelected]}>{t("amenity.internationalPlug")}</Text>
+                </TouchableOpacity>
               </>
             )}
           </View>

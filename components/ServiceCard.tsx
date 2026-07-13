@@ -19,9 +19,12 @@ import { memo, useMemo } from "react";
 const CARD_RADIUS = 10;
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 
 type NearToData = { name: string; distanceMeters: number };

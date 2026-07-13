@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import LoadingCard from "../../components/LoadingCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -59,7 +60,16 @@ function makeStyles(c: ThemeColors) {
       flexDirection: "row",
       alignItems: "stretch",
       backgroundColor: c.listBackground,
-      height: 140,
+      minHeight: 140,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOpacity: 0.10,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 5,
+      overflow: "hidden",
     },
     cardImageWrap: {
       width: 110,
@@ -144,7 +154,7 @@ export default function HostReservations() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { user } = useAuthState();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
 
@@ -183,17 +193,22 @@ export default function HostReservations() {
 
   return (
     <View style={styles.screen}>
-      <TabTopNotch />
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
+      <TabTopNotch hostMode />
       <FlatList
           data={items}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.divider} />}
           ListHeaderComponent={
             <View style={styles.titleBlock}>
               <Text style={styles.title}>{t("host.reservations.title")}</Text>
-              {hostLabel ? <Text style={styles.hostSubtitle}>{hostLabel}</Text> : null}
             </View>
           }
           ListEmptyComponent={

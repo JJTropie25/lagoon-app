@@ -3,9 +3,9 @@ import {
   Text,
   StyleSheet,
   Animated,
+  ScrollView,
   TouchableOpacity,
   Image,
-  ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -21,7 +21,7 @@ import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { useTheme } from "../../../lib/theme-context";
 import { type ThemeColors } from "../../../lib/theme";
-import { type ServiceAmenities, toCategoryIcon } from "../../../lib/services";
+import { type Service, type ServiceAmenities, toCategoryIcon } from "../../../lib/services";
 import { addRecentlyViewedId } from "../../../lib/recentlyViewed";
 import { useAppDialog } from "../../../components/AppDialogProvider";
 import { fetchServiceReviews, type ServiceReview } from "../../../lib/reviews";
@@ -29,9 +29,12 @@ import { fetchServiceReviews, type ServiceReview } from "../../../lib/reviews";
 const IMAGE_HEIGHT = 280;
 
 const CATEGORY_COLORS_SD: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 
 function parseImageUrls(imageUrl: string | null | undefined): string[] {
@@ -97,6 +100,7 @@ function makeStyles(c: ThemeColors) {
     imageWrap: {
       height: IMAGE_HEIGHT,
       backgroundColor: c.surfaceSoft,
+      overflow: "hidden",
     },
     imageFill: {
       width: "100%",
@@ -547,12 +551,16 @@ export default function ServiceDetails() {
   const summaryLocation = serviceLocation ?? destination ?? "-";
 
   const normalizedCategory = useMemo(() => {
-    if (serviceCategory && ["rest", "shower", "storage"].includes(serviceCategory)) {
-      return serviceCategory as "rest" | "shower" | "storage";
+    const ALL_CATS = ["rest", "shower", "storage", "focus", "tavolo", "charge"];
+    if (serviceCategory && ALL_CATS.includes(serviceCategory)) {
+      return serviceCategory as Service["category"];
     }
     const value = String(microservice ?? "").toLowerCase();
-    if (value.includes("rest") || value.includes(t("category.rest").toLowerCase())) return "rest";
-    if (value.includes("shower") || value.includes(t("category.shower").toLowerCase())) return "shower";
+    if (value.includes("rest")    || value.includes(t("category.rest").toLowerCase()))    return "rest";
+    if (value.includes("shower")  || value.includes(t("category.shower").toLowerCase()))  return "shower";
+    if (value.includes("focus")   || value.includes(t("category.focus").toLowerCase()))   return "focus";
+    if (value.includes("tavolo")  || value.includes(t("category.tavolo").toLowerCase()))  return "tavolo";
+    if (value.includes("charge")  || value.includes(t("category.charge").toLowerCase()))  return "charge";
     if (value.includes("storage") || value.includes(t("category.storage").toLowerCase())) return "storage";
     return null;
   }, [serviceCategory, microservice, t]);
@@ -628,6 +636,14 @@ export default function ServiceDetails() {
     if (serviceAmenities.blanket) items.push({ icon: "weather-night", text: t("amenity.blanket") });
     if (serviceAmenities.sofa_or_bed) items.push({ icon: serviceAmenities.sofa_or_bed === "bed" ? "bed-king" : "sofa", text: t("amenity.sofaBed") });
     if (serviceAmenities.toilet_access) items.push({ icon: "toilet", text: t("amenity.toiletAccess") });
+    if (serviceAmenities.wifi) items.push({ icon: "wifi", text: t("amenity.wifi") });
+    if (serviceAmenities.ergonomic_chair) items.push({ icon: "chair-rolling", text: t("amenity.ergonomicChair") });
+    if (serviceAmenities.isolated_space) items.push({ icon: "shield-home-outline", text: t("amenity.isolatedSpace") });
+    if (serviceAmenities.adjustable_lighting) items.push({ icon: "brightness-6", text: t("amenity.adjustableLighting") });
+    if (serviceAmenities.seats_count) items.push({ icon: "table-chair", text: t("amenity.seatsCount").replace("{count}", String(serviceAmenities.seats_count)) });
+    if (serviceAmenities.voltage) items.push({ icon: "lightning-bolt", text: t("amenity.voltage").replace("{value}", String(serviceAmenities.voltage)) });
+    if (serviceAmenities.outlet_count) items.push({ icon: "power-socket-eu", text: t("amenity.outletCount").replace("{count}", String(serviceAmenities.outlet_count)) });
+    if (serviceAmenities.international_plug) items.push({ icon: "power-plug-outline", text: t("amenity.internationalPlug") });
     return items;
   }, [serviceAmenities, t]);
 
@@ -687,7 +703,7 @@ export default function ServiceDetails() {
   return (
     <View style={styles.screen}>
 
-      {/* Floating header */}
+      {/* Floating header — absolute, always on top */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Animated.View
           style={[
@@ -725,7 +741,7 @@ export default function ServiceDetails() {
         </View>
       </View>
 
-      {/* Scrollable content */}
+      {/* Main scroll — images + content scroll together, bookBar stays fixed below */}
       <Animated.ScrollView
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -738,16 +754,20 @@ export default function ServiceDetails() {
         )}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 90 + insets.bottom }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
       >
-        {/* Full-bleed image gallery */}
+        {/* Image gallery — first item inside scroll so it scrolls away naturally */}
         <View style={styles.imageWrap}>
           {imageUrls.length > 0 ? (
             <ScrollView
               horizontal
               pagingEnabled
+              nestedScrollEnabled
               showsHorizontalScrollIndicator={false}
-              style={{ flex: 1 }}
+              bounces={false}
+              overScrollMode="never"
+              scrollEventThrottle={16}
               onMomentumScrollEnd={(e) => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
                 setActiveImageIdx(idx);
@@ -757,7 +777,7 @@ export default function ServiceDetails() {
                 <Image
                   key={i}
                   source={{ uri: url }}
-                  style={[styles.imageFill, { width: screenWidth, height: IMAGE_HEIGHT }]}
+                  style={{ width: screenWidth, height: IMAGE_HEIGHT }}
                   resizeMode="cover"
                 />
               ))}
@@ -780,7 +800,7 @@ export default function ServiceDetails() {
           />
         </View>
 
-        {/* Content */}
+        {/* Content card — marginTop:-20 creates the rounded overlap with the image */}
         <View style={styles.content}>
 
           {/* Section 1: name + category */}

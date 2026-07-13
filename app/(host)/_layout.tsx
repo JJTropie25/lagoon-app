@@ -68,6 +68,11 @@ export default function HostTabsLayout() {
       <Tabs.Screen name="reservation/[bookingId]" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="check-in-confirmed" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="scan-qr"         options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="payments"            options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="terms"               options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="help"                options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="language-settings"   options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="edit-profile"        options={{ href: null, tabBarStyle: { display: "none" } }} />
     </Tabs>
   );
 }

@@ -159,6 +159,10 @@ export default function Help() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/profile");
+  };
 
   return (
     <View style={styles.screen}>
@@ -168,7 +172,7 @@ export default function Help() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Pressable style={styles.backBtn} onPress={handleBack}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Help & FAQ</Text>

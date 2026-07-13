@@ -5,7 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,9 +21,12 @@ import { createPaymentIntent } from "../../../lib/stripe";
 import { useStripeClient } from "../../../lib/useStripeClient";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 const DEFAULT_HEADER_COLOR = "#4F9B9B";
 
@@ -31,9 +36,7 @@ function makeStyles(c: ThemeColors) {
 
     header: {
       position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
+      top: 0, left: 0, right: 0,
       zIndex: 10,
       flexDirection: "row",
       alignItems: "center",
@@ -42,137 +45,126 @@ function makeStyles(c: ThemeColors) {
       gap: 8,
     },
     headerBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
+      width: 36, height: 36, borderRadius: 18,
+      alignItems: "center", justifyContent: "center",
     },
     headerTitle: {
       flex: 1,
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: 15, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: "#fff",
     },
 
-    content: {
-      paddingHorizontal: 16,
-      paddingBottom: 32,
-    },
-    section: {
-      paddingVertical: 16,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: c.divider,
-    },
+    content: { paddingHorizontal: 16, paddingBottom: 32 },
 
+    // Service summary card
+    serviceImage: {
+      width: "100%", height: 160,
+      borderRadius: 14,
+      backgroundColor: c.surfaceSoft,
+      marginBottom: 14,
+    },
+    summaryCard: {
+      backgroundColor: c.listBackground,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+      shadowColor: "#000",
+      shadowOpacity: 0.07,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+    },
     serviceName: {
-      fontSize: 20,
-      fontWeight: "700",
+      fontSize: 20, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: c.textPrimary,
+      marginBottom: 12,
     },
     infoRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 10,
+      flexDirection: "row", alignItems: "center",
+      gap: 8, marginBottom: 8,
     },
-    infoText: {
-      color: c.textSecondary,
-      fontSize: 14,
-      flex: 1,
-    },
+    infoText: { color: c.textSecondary, fontSize: 14, flex: 1 },
 
-    priceRow: {
+    // Price card
+    priceCard: {
+      backgroundColor: c.warmSurface,
+      borderRadius: 18,
+      padding: 16,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      marginBottom: 14,
     },
-    priceLabel: {
-      fontSize: 15,
-      fontWeight: "600",
-      color: c.textSecondary,
-    },
+    priceLabel: { fontSize: 14, fontWeight: "600", color: c.warmAccentDark },
+    priceBreakdown: { fontSize: 12, color: c.warmAccentDark, opacity: 0.7, marginTop: 2 },
     priceValue: {
-      fontSize: 26,
-      fontWeight: "700",
+      fontSize: 30, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: c.warmAccent,
     },
 
+    // Method section
     sectionLabel: {
-      fontSize: 15,
-      fontWeight: "700",
+      fontSize: 16, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: c.textPrimary,
       marginBottom: 12,
     },
     methodRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderRadius: 12,
-      backgroundColor: c.surfaceSoft,
+      flexDirection: "row", alignItems: "center",
+      paddingVertical: 14, paddingHorizontal: 16,
+      borderRadius: 14,
+      backgroundColor: c.listBackground,
       marginBottom: 10,
       gap: 12,
       borderWidth: 1.5,
       borderColor: "transparent",
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
     },
     methodRowSelected: {
       backgroundColor: c.warmSurface,
       borderColor: c.warmAccent,
     },
     methodText: { flex: 1 },
-    methodLabel: {
-      fontWeight: "600",
-      color: c.textPrimary,
-      fontSize: 14,
-    },
-    methodHint: {
-      color: c.textSecondary,
-      fontSize: 12,
-      marginTop: 2,
-    },
+    methodLabel: { fontWeight: "600", color: c.textPrimary, fontSize: 14 },
+    methodHint: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
     radio: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      borderWidth: 2,
-      borderColor: c.border,
-      alignItems: "center",
-      justifyContent: "center",
+      width: 20, height: 20, borderRadius: 10,
+      borderWidth: 2, borderColor: c.border,
+      alignItems: "center", justifyContent: "center",
     },
     radioSelected: { borderColor: c.warmAccent },
     radioDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+      width: 10, height: 10, borderRadius: 5,
       backgroundColor: c.warmAccent,
     },
 
     bookBar: {
-      paddingHorizontal: 16,
-      paddingTop: 12,
+      paddingHorizontal: 16, paddingTop: 12,
       backgroundColor: c.screenBackground,
-      borderTopWidth: 1,
-      borderTopColor: c.divider,
+      borderTopWidth: 1, borderTopColor: c.divider,
     },
     payButton: {
-      padding: 16,
-      backgroundColor: c.warmAccent,
-      borderRadius: 12,
-      alignItems: "center",
+      padding: 16, backgroundColor: c.warmAccent,
+      borderRadius: 14, alignItems: "center",
+      shadowColor: c.warmAccent,
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
     },
-    payButtonDisabled: { backgroundColor: c.warmAccentSoft },
-    payButtonText: {
-      color: "#fff",
-      fontWeight: "600",
-      fontSize: 16,
+    payButtonDisabled: {
+      backgroundColor: c.warmAccentSoft,
+      shadowOpacity: 0,
+      elevation: 0,
     },
+    payButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   });
 }
 
@@ -183,7 +175,7 @@ export default function Payment() {
   const { user } = useAuthState();
   const dialog = useAppDialog();
   const stripe = useStripeClient();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const {
@@ -225,6 +217,7 @@ export default function Payment() {
   const [processing, setProcessing] = useState(false);
   const [priceEur, setPriceEur] = useState<number | null>(null);
   const [loadingPrice, setLoadingPrice] = useState(false);
+  const [serviceImageUrl, setServiceImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -235,11 +228,19 @@ export default function Payment() {
       try {
         const { data } = await sb
           .from("services")
-          .select("price_eur")
+          .select("price_eur, image_url")
           .eq("id", serviceId)
           .maybeSingle();
         if (!mounted) return;
         setPriceEur(Number(data?.price_eur ?? 0));
+        if (data?.image_url) {
+          const raw: string = data.image_url;
+          if (raw.startsWith("[")) {
+            try { setServiceImageUrl(JSON.parse(raw)[0] ?? null); } catch { setServiceImageUrl(raw); }
+          } else {
+            setServiceImageUrl(raw);
+          }
+        }
       } finally {
         if (mounted) setLoadingPrice(false);
       }
@@ -366,6 +367,13 @@ export default function Payment() {
 
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
 
       {/* Fixed header */}
       <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: headerColor }]}>
@@ -383,35 +391,29 @@ export default function Payment() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 64 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Service name */}
-        <View style={styles.section}>
-          <Text style={styles.serviceName}>{microservice ?? "-"}</Text>
-        </View>
-        <View style={styles.divider} />
+        {/* Service image */}
+        {serviceImageUrl ? (
+          <Image source={{ uri: serviceImageUrl }} style={styles.serviceImage} resizeMode="cover" />
+        ) : null}
 
-        {/* Details */}
-        <View style={styles.section}>
+        {/* Service summary card */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.serviceName}>{microservice ?? "-"}</Text>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.infoText}>{destination ?? "-"}</Text>
           </View>
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { marginBottom: 0 }]}>
             <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.infoText}>{displayTime}</Text>
           </View>
-          <View style={[styles.infoRow, { marginBottom: 0 }]}>
-            <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>{displayPeople}</Text>
-          </View>
         </View>
-        <View style={styles.divider} />
-
-        {/* Price */}
-        <View style={[styles.section, styles.priceRow]}>
+        {/* Price card */}
+        <View style={styles.priceCard}>
           <View>
             <Text style={styles.priceLabel}>Totale</Text>
             {slotCount > 1 && !loadingPrice && (
-              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              <Text style={styles.priceBreakdown}>
                 {`${slotCount} slot × €${(priceEur ?? 0).toFixed(2)}`}
               </Text>
             )}
@@ -420,10 +422,9 @@ export default function Payment() {
             {loadingPrice ? "…" : `€${(totalPriceEur ?? 0).toFixed(2)}`}
           </Text>
         </View>
-        <View style={styles.divider} />
 
         {/* Payment method */}
-        <View style={styles.section}>
+        <View>
           <Text style={styles.sectionLabel}>{t("payment.chooseMethod")}</Text>
 
           <TouchableOpacity
@@ -463,6 +464,7 @@ export default function Payment() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
 
       {/* Fixed pay button */}
       <View style={[styles.bookBar, { paddingBottom: insets.bottom + 8 }]}>

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -31,6 +32,7 @@ type Step = {
   sublabel?: string;
   isLast?: boolean;
   content?: React.ReactNode;
+  fullWidthContent?: React.ReactNode;
 };
 
 function makeStyles(c: ThemeColors) {
@@ -79,34 +81,54 @@ function makeStyles(c: ThemeColors) {
     // directions button (inside timeline)
     dirBtn: {
       marginTop: 10,
-      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-      backgroundColor: TEAL_BG, borderRadius: 12,
-      paddingHorizontal: 14, paddingVertical: 12,
-      borderWidth: 1, borderColor: TEAL + "44",
+      flexDirection: "row", alignItems: "center", gap: 10,
+      backgroundColor: TEAL, borderRadius: 14,
+      paddingHorizontal: 16, paddingVertical: 13,
+      shadowColor: TEAL,
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
     },
-    dirBtnText: { fontSize: 14, fontWeight: "700", color: TEAL },
+    dirBtnText: { flex: 1, fontSize: 14, fontWeight: "700", color: "#fff" },
 
-    // QR card
+    // QR card — full-width (rendered outside timelineRight, compensate paddingLeft: 4 of timeline)
     qrCard: {
       marginTop: 12,
+      marginLeft: -4,
       backgroundColor: c.listBackground,
-      borderRadius: 18,
-      padding: 24,
+      borderRadius: 20,
+      paddingTop: 24,
+      paddingBottom: 20,
+      paddingHorizontal: 24,
       alignItems: "center",
       shadowColor: "#000",
-      shadowOpacity: 0.10,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 6,
-      borderWidth: 1,
-      borderColor: c.border,
+      shadowOpacity: 0.08,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    qrCardTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: TEAL,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+      marginBottom: 16,
+    },
+    qrDivider: {
+      marginTop: 20,
+      width: "100%",
+      height: 1,
+      backgroundColor: c.border,
+      opacity: 0.5,
     },
     qrCardHint: {
-      marginTop: 16,
-      fontSize: 13,
-      color: c.textSecondary,
+      marginTop: 12,
+      fontSize: 12,
+      color: c.textMuted,
       textAlign: "center",
-      fontWeight: "600",
+      letterSpacing: 0.3,
     },
     qrPlaceholder: { color: c.textMuted, fontWeight: "600", paddingVertical: 40 },
   });
@@ -116,7 +138,7 @@ export default function BookingConfirmation() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { destination, timeslot, microservice, selectedHour, bookingId, qrToken } =
@@ -133,6 +155,8 @@ export default function BookingConfirmation() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [serviceTitle, setServiceTitle] = useState<string | null>(null);
   const [serviceLocation, setServiceLocation] = useState<string | null>(null);
+  const [serviceLatitude, setServiceLatitude] = useState<number | null>(null);
+  const [serviceLongitude, setServiceLongitude] = useState<number | null>(null);
   const [slotStart, setSlotStart] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
 
@@ -141,7 +165,7 @@ export default function BookingConfirmation() {
     if (!supabase || !bookingId) return;
     supabase
       .from("bookings")
-      .select("qr_token, slot_start, payment_status, service:services(title, location, image_url)")
+      .select("qr_token, slot_start, payment_status, service:services(title, location, image_url, latitude, longitude)")
       .eq("id", bookingId)
       .single()
       .then(({ data }) => {
@@ -153,6 +177,8 @@ export default function BookingConfirmation() {
         if (svc?.title) setServiceTitle(svc.title);
         if (svc?.location) setServiceLocation(svc.location);
         if (svc?.image_url) setImageUrl(parseFirstImageUrl(svc.image_url));
+        if (svc?.latitude != null) setServiceLatitude(svc.latitude);
+        if (svc?.longitude != null) setServiceLongitude(svc.longitude);
       });
     return () => { isMounted = false; };
   }, [bookingId]);
@@ -202,12 +228,19 @@ export default function BookingConfirmation() {
           onPress={() =>
             router.push({
               pathname: "/Directions",
-              params: { microservice: summaryTitle, destination: summaryDestination, timeslot: summaryTimeslot },
+              params: {
+                microservice: summaryTitle,
+                destination: summaryDestination,
+                timeslot: summaryTimeslot,
+                latitude: serviceLatitude != null ? String(serviceLatitude) : undefined,
+                longitude: serviceLongitude != null ? String(serviceLongitude) : undefined,
+              },
             })
           }
         >
+          <MaterialCommunityIcons name="navigation-variant-outline" size={18} color="#fff" />
           <Text style={styles.dirBtnText}>Indicazioni stradali</Text>
-          <MaterialCommunityIcons name="arrow-right" size={18} color={TEAL} />
+          <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       ),
     },
@@ -218,13 +251,15 @@ export default function BookingConfirmation() {
       label: "Check-in",
       sublabel: "Mostra il codice QR all'ingresso",
       isLast: true,
-      content: (
+      fullWidthContent: (
         <View style={styles.qrCard}>
+          <Text style={styles.qrCardTitle}>Il tuo codice</Text>
           {token ? (
-            <QRCode value={token} size={190} />
+            <QRCode value={token} size={180} />
           ) : (
             <Text style={styles.qrPlaceholder}>{t("booking.qrCode")}</Text>
           )}
+          <View style={styles.qrDivider} />
           <Text style={styles.qrCardHint}>Scansionato dallo staff all'ingresso</Text>
         </View>
       ),
@@ -233,6 +268,13 @@ export default function BookingConfirmation() {
 
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.replace("/(tabs)/guest")}>
@@ -266,23 +308,26 @@ export default function BookingConfirmation() {
         {/* Timeline */}
         <View style={styles.timeline}>
           {steps.map((step, i) => (
-            <View key={i} style={styles.timelineRow}>
-              {/* Left: dot + line */}
-              <View style={styles.timelineLeft}>
-                <View style={[styles.timelineDot, { backgroundColor: step.bg }]}>
-                  <MaterialCommunityIcons name={step.icon as any} size={17} color={step.color} />
+            <View key={i}>
+              <View style={styles.timelineRow}>
+                {/* Left: dot + line */}
+                <View style={styles.timelineLeft}>
+                  <View style={[styles.timelineDot, { backgroundColor: step.bg }]}>
+                    <MaterialCommunityIcons name={step.icon as any} size={17} color={step.color} />
+                  </View>
+                  {!step.isLast && (
+                    <View style={[styles.timelineLine, { backgroundColor: colors.divider }]} />
+                  )}
                 </View>
-                {!step.isLast && (
-                  <View style={[styles.timelineLine, { backgroundColor: colors.divider }]} />
-                )}
-              </View>
 
-              {/* Right: content */}
-              <View style={styles.timelineRight}>
-                <Text style={styles.stepLabel}>{step.label}</Text>
-                {step.sublabel ? <Text style={styles.stepSublabel}>{step.sublabel}</Text> : null}
-                {step.content ?? null}
+                {/* Right: content */}
+                <View style={styles.timelineRight}>
+                  <Text style={styles.stepLabel}>{step.label}</Text>
+                  {step.sublabel ? <Text style={styles.stepSublabel}>{step.sublabel}</Text> : null}
+                  {step.content ?? null}
+                </View>
               </View>
+              {step.fullWidthContent ?? null}
             </View>
           ))}
         </View>

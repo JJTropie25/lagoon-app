@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View, ScrollView } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -6,15 +7,10 @@ import { useI18n } from "../../lib/i18n";
 import { useTheme } from "../../lib/theme-context";
 import { type ThemeColors } from "../../lib/theme";
 import { useAuthState } from "../../lib/auth";
-import { useAppDialog } from "../../components/AppDialogProvider";
 import { supabase } from "../../lib/supabase";
 import TabTopNotch from "../../components/TabTopNotch";
 import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import * as WebBrowser from "expo-web-browser";
-import { createAccountLink, createConnectedAccount, getStripeReturnUrl } from "../../lib/stripe";
-
-WebBrowser.maybeCompleteAuthSession();
 
 const TEAL = "#4F9B9B";
 
@@ -22,9 +18,8 @@ function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.screenBackground },
 
-    // Teal header
+    // Gradient header
     headerSection: {
-      backgroundColor: TEAL,
       paddingHorizontal: 20,
       paddingBottom: 28,
     },
@@ -67,7 +62,7 @@ function makeStyles(c: ThemeColors) {
       paddingHorizontal: 20,
       paddingVertical: 15,
       gap: 14,
-      backgroundColor: c.screenBackground,
+      backgroundColor: "transparent",
     },
     listRowLabel: {
       flex: 1,
@@ -96,18 +91,6 @@ function makeStyles(c: ThemeColors) {
       fontWeight: "600",
       flexShrink: 1,
     },
-    activateBtn: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-      backgroundColor: c.warmAccent,
-    },
-    activateBtnText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: "#fff",
-    },
-
     // Theme toggle
     themeToggle: {
       flexDirection: "row",
@@ -151,14 +134,12 @@ export default function HostProfile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const dialog = useAppDialog();
   const { user } = useAuthState();
   const { colors, mode, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [hostStatus, setHostStatus] = useState<any>(null);
-  const [activating, setActivating] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -189,43 +170,6 @@ export default function HostProfile() {
     }, [user])
   );
 
-  const handleActivatePayments = async () => {
-    if (!user || !supabase) return;
-    setActivating(true);
-
-    // Only create a new account if none exists yet
-    if (!hostStatus?.stripe_account_id) {
-      const created = await createConnectedAccount();
-      if (created.error) {
-        setActivating(false);
-        await dialog.alert("Payments", created.error);
-        return;
-      }
-      // Refresh host row so we have the new stripe_account_id
-      const { data: refreshed } = await supabase
-        .from("hosts")
-        .select("id, stripe_account_id, stripe_onboarding_complete, stripe_charges_enabled, stripe_payouts_enabled")
-        .eq("guest_id", user.id)
-        .maybeSingle();
-      if (refreshed) setHostStatus(refreshed);
-    }
-
-    const returnUrl = getStripeReturnUrl("/host-onboarding");
-    const refreshUrl = getStripeReturnUrl("/host-onboarding");
-    if (!returnUrl || !refreshUrl) {
-      setActivating(false);
-      await dialog.alert("Payments", "Missing Supabase URL.");
-      return;
-    }
-    const link = await createAccountLink(returnUrl, refreshUrl);
-    setActivating(false);
-    if (link.error || !link.url) {
-      await dialog.alert("Payments", link.error ?? "Could not start onboarding.");
-      return;
-    }
-    await WebBrowser.openBrowserAsync(link.url);
-  };
-
   const displayName = user?.user_metadata?.username
     ? `@${user.user_metadata.username}`
     : user?.email ?? "@host";
@@ -234,10 +178,22 @@ export default function HostProfile() {
 
   return (
     <View style={styles.screen}>
-      <TabTopNotch />
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
+      <TabTopNotch hostMode transparent />
 
-      {/* Teal header — paddingTop clears status bar + notch (48px) */}
-      <View style={[styles.headerSection, { paddingTop: insets.top + 72 }]}>
+      {/* Gradient header */}
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#4F9B9B"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={[styles.headerSection, { paddingTop: insets.top + 72 }]}
+      >
         <View style={styles.profileRow}>
           <Image
             source={avatarUrl ? { uri: avatarUrl } : require("../../assets/images/icon.png")}
@@ -249,7 +205,7 @@ export default function HostProfile() {
               style={styles.manageRow}
               onPress={() =>
                 router.push({
-                  pathname: "/(tabs)/profile/Edit",
+                  pathname: "/(host)/edit-profile" as any,
                   params: { returnTo: "host" },
                 })
               }
@@ -263,13 +219,13 @@ export default function HostProfile() {
             </Pressable>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Scrollable list */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
 
         {/* Payments */}
-        <View style={styles.listRow}>
+        <Pressable style={styles.listRow} onPress={() => router.push("/(host)/payments" as any)}>
           <MaterialCommunityIcons
             name="bank-outline"
             size={20}
@@ -284,25 +240,13 @@ export default function HostProfile() {
               </Text>
             </View>
           ) : (
-            <Pressable
-              style={[styles.activateBtn, activating && { opacity: 0.6 }]}
-              onPress={handleActivatePayments}
-              disabled={activating}
-            >
-              <Text style={styles.activateBtnText}>
-                {activating
-                  ? "…"
-                  : hostStatus?.stripe_account_id
-                  ? "Continue Setup"
-                  : t("payments.activate")}
-              </Text>
-            </Pressable>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
           )}
-        </View>
+        </Pressable>
         <View style={styles.divider} />
 
         {/* Language */}
-        <Pressable style={styles.listRow} onPress={() => router.push("/(tabs)/profile/Language")}>
+        <Pressable style={styles.listRow} onPress={() => router.push("/(host)/language-settings" as any)}>
           <MaterialCommunityIcons name="translate" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>{t("profile.changeLanguage")}</Text>
           <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
@@ -337,7 +281,7 @@ export default function HostProfile() {
         {/* Terms & Conditions */}
         <Pressable
           style={styles.listRow}
-          onPress={() => dialog.alert("Terms & Conditions", "Coming soon")}
+          onPress={() => router.push("/(host)/terms" as any)}
         >
           <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Terms & Conditions</Text>
@@ -348,7 +292,7 @@ export default function HostProfile() {
         {/* Help */}
         <Pressable
           style={styles.listRow}
-          onPress={() => dialog.alert("Help", "Coming soon")}
+          onPress={() => router.push("/(host)/help" as any)}
         >
           <MaterialCommunityIcons name="help-circle-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Help</Text>

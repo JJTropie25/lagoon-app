@@ -10,9 +10,12 @@ import * as Location from "expo-location";
 import DirectionsMap from "../components/DirectionsMap";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 const DEFAULT_PILL_COLOR = "#4F9B9B";
 

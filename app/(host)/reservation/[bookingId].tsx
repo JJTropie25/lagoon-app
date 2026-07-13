@@ -21,9 +21,12 @@ import { toCategoryIcon, parseFirstImageUrl } from "../../../lib/services";
 const HEADER_COLOR = "#4F9B9B";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 
 function makeStyles(c: ThemeColors) {

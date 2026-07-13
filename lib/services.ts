@@ -11,12 +11,23 @@ export type ServiceAmenities = {
   blanket?: boolean;
   sofa_or_bed?: "sofa" | "bed";
   toilet_access?: boolean;
+  // focus
+  wifi?: boolean;
+  ergonomic_chair?: boolean;
+  isolated_space?: boolean;
+  adjustable_lighting?: boolean;
+  // tavolo
+  seats_count?: number;
+  // charge
+  voltage?: number;
+  outlet_count?: number;
+  international_plug?: boolean;
 };
 
 export type Service = {
   id: string;
   title: string;
-  category: "rest" | "shower" | "storage";
+  category: "rest" | "shower" | "storage" | "focus" | "tavolo" | "charge";
   description?: string | null;
   price_eur: number;
   image_url?: string | null;
@@ -81,13 +92,19 @@ export function toDistanceLabel(distanceMeters?: number | null): string | undefi
 }
 
 export function toTypeKey(category: Service["category"]) {
-  if (category === "rest") return "category.rest";
-  if (category === "shower") return "category.shower";
+  if (category === "rest")    return "category.rest";
+  if (category === "shower")  return "category.shower";
+  if (category === "focus")   return "category.focus";
+  if (category === "tavolo")  return "category.tavolo";
+  if (category === "charge")  return "category.charge";
   return "category.storage";
 }
 
 export function toCategoryIcon(category: Service["category"]) {
-  if (category === "rest") return "bed-king";
-  if (category === "shower") return "shower";
+  if (category === "rest")    return "bed-king";
+  if (category === "shower")  return "shower";
+  if (category === "focus")   return "laptop";
+  if (category === "tavolo")  return "silverware-fork-knife";
+  if (category === "charge")  return "lightning-bolt";
   return "locker";
 }

@@ -15,9 +15,13 @@ export type PlaceSuggestion = {
 
 // ── Photon (komoot) ───────────────────────────────────────────────────────────
 // Returns coordinates directly — no second "details" call needed.
+// Italy bounding box: west, south, east, north
+const ITALY_BBOX = "6.6273,36.6199,18.5205,47.0922";
+
 async function photonAutocomplete(query: string, limit: number): Promise<PlaceSuggestion[]> {
   const url =
-    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=it&limit=${limit}`;
+    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=it&limit=${limit}` +
+    `&bbox=${ITALY_BBOX}&osm_tag=place`;
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return [];
   const payload = (await res.json()) as {
@@ -57,7 +61,7 @@ async function photonAutocomplete(query: string, limit: number): Promise<PlaceSu
 async function nominatimSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
   const url =
     `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}` +
-    `&format=json&limit=${limit}&accept-language=it&addressdetails=0`;
+    `&format=json&limit=${limit}&accept-language=it&addressdetails=0&countrycodes=it`;
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return [];
   const payload = (await res.json()) as Array<{
@@ -81,7 +85,7 @@ async function nominatimSearch(query: string, limit: number): Promise<PlaceSugge
 // ── Public API ────────────────────────────────────────────────────────────────
 export async function searchPlaceSuggestions(query: string, limit = 6): Promise<PlaceSuggestion[]> {
   const normalized = query.trim();
-  if (normalized.length < 1) return [];
+  if (normalized.length < 3) return [];
   try {
     const results = await photonAutocomplete(normalized, limit);
     if (results.length > 0) return results;

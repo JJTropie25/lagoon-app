@@ -6,6 +6,7 @@ import {
   Pressable,
   Image,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,9 +23,12 @@ import LoadingCard from "../../components/LoadingCard";
 import { toCategoryIcon } from "../../lib/services";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 
 type BookingItem = {
@@ -65,6 +69,15 @@ function makeStyles(c: ThemeColors) {
       alignItems: "stretch",
       backgroundColor: c.listBackground,
       minHeight: 160,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOpacity: 0.10,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 5,
+      overflow: "hidden",
     },
     cardExpired: {
       opacity: 0.7,
@@ -201,7 +214,7 @@ export default function Bookings() {
   const { t } = useI18n();
   const { user } = useAuthState();
   const isFocused = useIsFocused();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
   const [bookings, setBookings] = useState<BookingItem[]>([]);
@@ -379,59 +392,33 @@ export default function Bookings() {
                 </Text>
               </Pressable>
             ) : (
-              <>
-                <Pressable
-                  style={styles.btnOutline}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/Directions",
-                      params: {
-                        microservice: item.title,
-                        destination: item.destination,
-                        timeslot: item.timeslot,
-                        people: item.people,
-                        latitude: String(item.latitude),
-                        longitude: String(item.longitude),
-                        category: item.category ?? "",
-                      },
-                    })
-                  }
+              <Pressable
+                style={styles.btnFilled}
+                onPress={() =>
+                  router.push({
+                    pathname: "/ManageBooking",
+                    params: {
+                      bookingId: item.id,
+                      from: "bookings",
+                      microservice: item.title,
+                      destination: item.destination,
+                      timeslot: item.timeslot,
+                      people: item.people,
+                      latitude: item.latitude != null ? String(item.latitude) : undefined,
+                      longitude: item.longitude != null ? String(item.longitude) : undefined,
+                    },
+                  })
+                }
+              >
+                <Text
+                  style={styles.btnFilledText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
                 >
-                  <Text
-                    style={styles.btnOutlineText}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                  >
-                    {t("booking.getDirections")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={styles.btnFilled}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/ManageBooking",
-                      params: {
-                        bookingId: item.id,
-                        from: "bookings",
-                        microservice: item.title,
-                        destination: item.destination,
-                        timeslot: item.timeslot,
-                        people: item.people,
-                      },
-                    })
-                  }
-                >
-                  <Text
-                    style={styles.btnFilledText}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                  >
-                    {t("booking.manage")}
-                  </Text>
-                </Pressable>
-              </>
+                  {t("booking.manage")}
+                </Text>
+              </Pressable>
             )}
           </View>
         </View>
@@ -441,13 +428,19 @@ export default function Bookings() {
 
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
       <TabTopNotch />
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.divider} />}
         ListHeaderComponent={
           <Text style={styles.pageTitle}>{t("bookings.title")}</Text>
         }

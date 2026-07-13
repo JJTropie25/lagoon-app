@@ -9,7 +9,9 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  StatusBar,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -86,6 +88,8 @@ const PREFIX_OPTIONS = [
   { code: "+880", country: "Bangladesh",      flag: "🇧🇩" },
 ];
 
+type EditField = "username" | "email" | "password" | "phone";
+
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.screenBackground },
@@ -112,72 +116,143 @@ function makeStyles(c: ThemeColors) {
       color: "#fff",
     },
 
-    content: { paddingHorizontal: 20 },
-    section: { paddingVertical: 14 },
-    divider: { height: 1, backgroundColor: c.divider },
+    scroll: { paddingHorizontal: 16 },
 
     // Avatar row
     avatarSection: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 18,
+      gap: 16,
       paddingVertical: 20,
     },
     avatarWrapper: {},
     avatar: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
+      width: 68,
+      height: 68,
+      borderRadius: 34,
       backgroundColor: c.surfaceSoft,
     },
     cameraBadge: {
       position: "absolute",
-      bottom: 0,
-      right: 0,
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      bottom: 0, right: 0,
+      width: 24, height: 24, borderRadius: 12,
       backgroundColor: HEADER_COLOR,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: c.screenBackground,
+      alignItems: "center", justifyContent: "center",
+      borderWidth: 2, borderColor: c.screenBackground,
     },
     avatarMeta: { flex: 1 },
-    avatarHint: {
-      fontSize: 12,
-      color: c.textSecondary,
-      marginBottom: 6,
+    avatarName: {
+      fontSize: 16, fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+      marginBottom: 2,
     },
     changePhotoText: {
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: 13, fontWeight: "600",
       color: HEADER_COLOR,
     },
 
-    fieldLabel: {
-      fontSize: 11,
-      fontWeight: "700",
-      color: c.textSecondary,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 8,
+    // Settings card
+    card: {
+      backgroundColor: c.listBackground,
+      borderRadius: 16,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: c.border,
+      marginBottom: 20,
     },
-    input: {
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      gap: 10,
+    },
+    rowLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: c.textPrimary,
+      width: 110,
+    },
+    rowValue: {
+      flex: 1,
+      fontSize: 14,
+      color: c.textSecondary,
+      textAlign: "right",
+      marginRight: 4,
+    },
+    rowDivider: {
+      height: 1,
+      backgroundColor: c.divider,
+      marginLeft: 16,
+    },
+
+    // Logout button
+    logoutBtn: {
+      borderWidth: 1.5,
+      borderColor: DANGER_COLOR,
+      paddingVertical: 15,
+      borderRadius: 14,
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    logoutBtnText: { color: DANGER_COLOR, fontSize: 15, fontWeight: "700" },
+
+    // Field edit full-screen modal
+    editBackdrop: {
+      flex: 1,
+      backgroundColor: c.screenBackground,
+    },
+    editSheet: {
+      paddingHorizontal: 16,
+    },
+    editHandle: {
+      height: 0,
+    },
+    editSheetHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 20,
+    },
+    editSheetCancel: {
+      fontSize: 14, fontWeight: "600",
+      color: c.textSecondary,
+      paddingVertical: 4,
+    },
+    editSheetTitle: {
+      fontSize: 16, fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+    },
+    editSheetSave: {
+      fontSize: 14, fontWeight: "700",
+      color: HEADER_COLOR,
+      paddingVertical: 4,
+    },
+    editSheetSaveDisabled: { opacity: 0.45 },
+
+    editInput: {
+      backgroundColor: c.surfaceSoft,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 14,
-      backgroundColor: c.surfaceSoft,
-      color: c.textPrimary,
       fontSize: 15,
+      color: c.textPrimary,
+      marginBottom: 6,
+    },
+    editHint: {
+      fontSize: 12,
+      color: c.textMuted,
+      marginBottom: 8,
     },
 
-    // Password row (input + eye toggle)
     passwordRow: {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: c.surfaceSoft,
       borderRadius: 12,
+      marginBottom: 6,
     },
     passwordInput: {
       flex: 1,
@@ -187,13 +262,9 @@ function makeStyles(c: ThemeColors) {
       fontSize: 15,
       backgroundColor: "transparent",
     },
-    passwordEye: {
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-    },
+    passwordEye: { paddingHorizontal: 14 },
 
-    // Phone row
-    phoneRow: { flexDirection: "row", gap: 10 },
+    phoneEditRow: { flexDirection: "row", gap: 10, marginBottom: 6 },
     prefixBtn: {
       backgroundColor: c.surfaceSoft,
       borderRadius: 12,
@@ -202,31 +273,12 @@ function makeStyles(c: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       gap: 4,
-      minWidth: 86,
+      minWidth: 90,
     },
     prefixBtnText: { color: c.textPrimary, fontWeight: "700", fontSize: 14 },
     phoneInput: { flex: 1 },
 
-    // Buttons
-    saveBtn: {
-      backgroundColor: c.warmAccent,
-      paddingVertical: 15,
-      borderRadius: 12,
-      alignItems: "center",
-      marginBottom: 12,
-    },
-    saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Baloo2_700Bold" },
-    saveBtnDisabled: { opacity: 0.55 },
-    logoutBtn: {
-      borderWidth: 1.5,
-      borderColor: DANGER_COLOR,
-      paddingVertical: 15,
-      borderRadius: 12,
-      alignItems: "center",
-    },
-    logoutBtnText: { color: DANGER_COLOR, fontSize: 15, fontWeight: "700" },
-
-    // Bottom-sheet prefix modal
+    // Country code bottom sheet
     modalBackdrop: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.45)",
@@ -241,9 +293,7 @@ function makeStyles(c: ThemeColors) {
       paddingBottom: 32,
     },
     modalHandle: {
-      width: 36,
-      height: 4,
-      borderRadius: 2,
+      width: 36, height: 4, borderRadius: 2,
       backgroundColor: c.border,
       alignSelf: "center",
       marginBottom: 16,
@@ -255,8 +305,7 @@ function makeStyles(c: ThemeColors) {
       marginBottom: 10,
     },
     modalTitle: {
-      fontSize: 16,
-      fontWeight: "700",
+      fontSize: 16, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: c.textPrimary,
     },
@@ -268,14 +317,8 @@ function makeStyles(c: ThemeColors) {
       borderBottomWidth: 1,
       borderBottomColor: c.divider,
     },
-    prefixItemActive: {},
     prefixFlag: { fontSize: 18, width: 26 },
-    prefixCode: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: c.textPrimary,
-      width: 46,
-    },
+    prefixCode: { fontSize: 14, fontWeight: "700", color: c.textPrimary, width: 46 },
     prefixCodeActive: { color: HEADER_COLOR },
     prefixCountry: { flex: 1, fontSize: 14, color: c.textSecondary },
     prefixCountryActive: { color: c.textPrimary, fontWeight: "600" },
@@ -289,21 +332,28 @@ export default function EditProfile() {
   const { t } = useI18n();
   const dialog = useAppDialog();
   const { user } = useAuthState();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const returnRoute = returnTo === "host" ? "/(host)/profile" : "/(tabs)/profile";
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [phonePrefix, setPhonePrefix] = useState("+39");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [initialPhonePrefix, setInitialPhonePrefix] = useState("+39");
   const [initialPhoneNumber, setInitialPhoneNumber] = useState("");
-  const [prefixOpen, setPrefixOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Field editing modal
+  const [editingField, setEditingField] = useState<EditField | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editPhonePrefix, setEditPhonePrefix] = useState("+39");
+  const [editPhoneNumber, setEditPhoneNumber] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [prefixOpen, setPrefixOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -334,6 +384,56 @@ export default function EditProfile() {
       });
     return () => { isMounted = false; };
   }, [user]);
+
+  const openEdit = (field: EditField) => {
+    if (field === "username") setEditValue(username);
+    else if (field === "email") setEditValue(email);
+    else if (field === "password") setEditValue("");
+    else if (field === "phone") {
+      setEditPhonePrefix(phonePrefix);
+      setEditPhoneNumber(phoneNumber);
+    }
+    setShowPassword(false);
+    setEditingField(field);
+  };
+
+  const closeEdit = () => setEditingField(null);
+
+  const handleSaveField = async () => {
+    if (!supabase || !user) return;
+    setEditSaving(true);
+    try {
+      if (editingField === "username") {
+        const { error } = await supabase.auth.updateUser({ data: { username: editValue.trim() } });
+        if (error) { await dialog.alert(t("edit.saveChanges"), error.message); return; }
+        setUsername(editValue.trim());
+      } else if (editingField === "email") {
+        const { error } = await supabase.auth.updateUser({ email: editValue.trim() });
+        if (error) { await dialog.alert(t("edit.saveChanges"), error.message); return; }
+        setEmail(editValue.trim());
+      } else if (editingField === "password") {
+        const trimmed = editValue.trim();
+        if (!trimmed) { closeEdit(); return; }
+        const { error } = await supabase.auth.updateUser({ password: trimmed });
+        if (error) { await dialog.alert(t("edit.saveChanges"), error.message); return; }
+      } else if (editingField === "phone") {
+        const nextPhone = editPhoneNumber.trim();
+        if (!editPhonePrefix || !nextPhone) { await dialog.alert(t("edit.saveChanges"), t("edit.phoneRequired")); return; }
+        const { error } = await supabase.from("profiles").upsert(
+          { id: user.id, phone_country_code: editPhonePrefix, phone_number: nextPhone },
+          { onConflict: "id" }
+        );
+        if (error) { await dialog.alert(t("edit.saveChanges"), error.message); return; }
+        setPhonePrefix(editPhonePrefix);
+        setPhoneNumber(nextPhone);
+        setInitialPhonePrefix(editPhonePrefix);
+        setInitialPhoneNumber(nextPhone);
+      }
+      closeEdit();
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const handlePickPhoto = async () => {
     if (!user || !supabase) {
@@ -400,80 +500,47 @@ export default function EditProfile() {
     router.replace("/(auth)/sign-in");
   };
 
-  const handleSave = async () => {
-    if (!supabase) {
-      await dialog.alert(t("edit.saveChanges"), "Supabase is not configured.");
-      return;
-    }
-    if (!user) { router.replace("/(auth)/sign-in"); return; }
-    const nextPhone = phoneNumber.trim();
-    if (!phonePrefix || !nextPhone) { await dialog.alert(t("edit.saveChanges"), t("edit.phoneRequired")); return; }
-    setSaving(true);
-    const profileUpdates: { email?: string; data?: { username?: string } } = {};
-    const nextEmail = email.trim();
-    const nextUsername = username.trim();
-    const nextPassword = password.trim();
-    if (nextEmail && nextEmail !== user.email) profileUpdates.email = nextEmail;
-    if (nextUsername && nextUsername !== user.user_metadata?.username) profileUpdates.data = { username: nextUsername };
-    const hasProfileUpdates = Boolean(profileUpdates.email || profileUpdates.data);
-    const hasPasswordUpdate = nextPassword.length > 0;
-    const hasPhoneUpdates = phonePrefix !== initialPhonePrefix || nextPhone !== initialPhoneNumber;
-    if (!hasProfileUpdates && !hasPasswordUpdate && !hasPhoneUpdates) {
-      setSaving(false);
-      router.replace(returnRoute as any);
-      return;
-    }
-    if (hasProfileUpdates) {
-      const { error: profileError } = await supabase.auth.updateUser(profileUpdates);
-      if (profileError) { setSaving(false); await dialog.alert(t("edit.saveChanges"), profileError.message); return; }
-    }
-    if (hasPasswordUpdate) {
-      const { error: passwordError } = await supabase.auth.updateUser({ password: nextPassword });
-      if (passwordError) {
-        if (passwordError.message.includes("different from the old password")) {
-          setPassword("");
-        } else {
-          setSaving(false);
-          await dialog.alert(t("edit.saveChanges"), passwordError.message);
-          return;
-        }
-      }
-    }
-    if (hasPhoneUpdates) {
-      const { error: phoneSaveError } = await supabase.from("profiles").upsert({ id: user.id, phone_country_code: phonePrefix, phone_number: nextPhone }, { onConflict: "id" });
-      if (phoneSaveError) { setSaving(false); await dialog.alert(t("edit.saveChanges"), phoneSaveError.message); return; }
-      setInitialPhonePrefix(phonePrefix);
-      setInitialPhoneNumber(nextPhone);
-    }
-    setSaving(false);
-    await dialog.alert(t("edit.saveChanges"), t("edit.saved"));
-    router.replace(returnRoute as any);
-  };
-
   const headerH = insets.top + 52;
+  const displayName = username || user?.user_metadata?.username || "—";
+  const displayPhone = phoneNumber ? `${phonePrefix} ${phoneNumber}` : "—";
+
+  const fields: { key: EditField; label: string; value: string }[] = [
+    { key: "username", label: t("edit.username"),     value: displayName },
+    { key: "email",    label: t("edit.email"),        value: email || "—" },
+    { key: "password", label: t("edit.password"),     value: "••••••••" },
+    { key: "phone",    label: t("edit.phoneNumber"),  value: displayPhone },
+  ];
+
+  const editFieldLabel =
+    editingField === "username" ? t("edit.username")
+    : editingField === "email"  ? t("edit.email")
+    : editingField === "password" ? t("edit.password")
+    : t("edit.phoneNumber");
 
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
 
       {/* Fixed teal header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => router.replace(returnRoute as any)}
-        >
+        <TouchableOpacity style={styles.headerBtn} onPress={() => router.replace(returnRoute as any)}>
           <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("edit.title")}</Text>
       </View>
 
-      {/* Scrollable form */}
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: headerH + 8, paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: headerH + 8, paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-
-        {/* Avatar row — tappable with camera badge, info on right */}
+        {/* Avatar row */}
         <View style={styles.avatarSection}>
           <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickPhoto}>
             <Image
@@ -485,110 +552,108 @@ export default function EditProfile() {
             </View>
           </TouchableOpacity>
           <View style={styles.avatarMeta}>
-            <Text style={styles.avatarHint}>Profile photo</Text>
+            <Text style={styles.avatarName}>{displayName}</Text>
             <TouchableOpacity onPress={handlePickPhoto}>
               <Text style={styles.changePhotoText}>{t("edit.changePhoto")}</Text>
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.divider} />
 
-        {/* Username */}
-        <View style={styles.section}>
-          <Text style={styles.fieldLabel}>{t("edit.username")}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={user?.user_metadata?.username ?? t("edit.username")}
-            placeholderTextColor={colors.textMuted}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-          />
+        {/* Settings card */}
+        <View style={styles.card}>
+          {fields.map((field, i) => (
+            <View key={field.key}>
+              {i > 0 && <View style={styles.rowDivider} />}
+              <TouchableOpacity style={styles.row} onPress={() => openEdit(field.key)} activeOpacity={0.7}>
+                <Text style={styles.rowLabel}>{field.label}</Text>
+                <Text style={styles.rowValue} numberOfLines={1}>{field.value}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
-        <View style={styles.divider} />
 
-        {/* Email */}
-        <View style={styles.section}>
-          <Text style={styles.fieldLabel}>{t("edit.email")}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={user?.email ?? "email@example.com"}
-            placeholderTextColor={colors.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={email}
-            onChangeText={setEmail}
-          />
-        </View>
-        <View style={styles.divider} />
-
-        {/* Password with toggle */}
-        <View style={styles.section}>
-          <Text style={styles.fieldLabel}>{t("edit.password")}</Text>
-          <View style={styles.passwordRow}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={styles.passwordEye}
-              onPress={() => setShowPassword((v) => !v)}
-            >
-              <MaterialCommunityIcons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View style={styles.divider} />
-
-        {/* Phone */}
-        <View style={styles.section}>
-          <Text style={styles.fieldLabel}>{t("edit.phoneNumber")}</Text>
-          <View style={styles.phoneRow}>
-            <TouchableOpacity style={styles.prefixBtn} onPress={() => setPrefixOpen(true)}>
-              <Text style={styles.prefixBtnText}>{phonePrefix}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={16} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <TextInput
-              style={[styles.input, styles.phoneInput]}
-              placeholder="3331234567"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={(v) => setPhoneNumber(v.replace(/[^\d]/g, ""))}
-            />
-          </View>
-        </View>
-        <View style={styles.divider} />
-
-        {/* Actions */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            <Text style={styles.saveBtnText}>
-              {saving ? t("auth.loading") : t("edit.saveChanges")}
-            </Text>
+        {user ? (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutBtnText}>{t("profile.logout")}</Text>
           </TouchableOpacity>
-          {user ? (
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.logoutBtnText}>{t("profile.logout")}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
+        ) : null}
       </ScrollView>
+
+      {/* Field edit full-screen modal */}
+      <Modal
+        visible={editingField != null}
+        animationType="slide"
+        onRequestClose={closeEdit}
+        statusBarTranslucent
+      >
+        <View style={[styles.editBackdrop, { paddingTop: (StatusBar.currentHeight ?? 0) + insets.top + 12 }]}>
+          <View style={styles.editSheet}>
+            <View style={styles.editHandle} />
+            <View style={styles.editSheetHeader}>
+              <TouchableOpacity onPress={closeEdit}>
+                <Text style={styles.editSheetCancel}>Annulla</Text>
+              </TouchableOpacity>
+              <Text style={styles.editSheetTitle}>{editFieldLabel}</Text>
+              <TouchableOpacity onPress={handleSaveField} disabled={editSaving}>
+                <Text style={[styles.editSheetSave, editSaving && styles.editSheetSaveDisabled]}>
+                  {editSaving ? "..." : "Salva"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {editingField === "phone" ? (
+              <View style={styles.phoneEditRow}>
+                <TouchableOpacity style={styles.prefixBtn} onPress={() => setPrefixOpen(true)}>
+                  <Text style={styles.prefixBtnText}>{editPhonePrefix}</Text>
+                  <MaterialCommunityIcons name="chevron-down" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <TextInput
+                  style={[styles.editInput, styles.phoneInput]}
+                  placeholder="3331234567"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
+                  value={editPhoneNumber}
+                  onChangeText={(v) => setEditPhoneNumber(v.replace(/[^\d]/g, ""))}
+                  autoFocus
+                />
+              </View>
+            ) : editingField === "password" ? (
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Nuova password"
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+                <TouchableOpacity style={styles.passwordEye} onPress={() => setShowPassword((v) => !v)}>
+                  <MaterialCommunityIcons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TextInput
+                style={styles.editInput}
+                placeholder={editFieldLabel}
+                placeholderTextColor={colors.textMuted}
+                value={editValue}
+                onChangeText={setEditValue}
+                autoCapitalize={editingField === "email" ? "none" : "words"}
+                keyboardType={editingField === "email" ? "email-address" : "default"}
+                autoFocus
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Country code bottom sheet */}
       <Modal
@@ -607,24 +672,21 @@ export default function EditProfile() {
                 <MaterialCommunityIcons name="close" size={22} color={colors.textSecondary} />
               </Pressable>
             </View>
-            <ScrollView
-              style={{ maxHeight: 360 }}
-              showsVerticalScrollIndicator={false}
-            >
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
               {PREFIX_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt.code}
                   style={styles.prefixItem}
-                  onPress={() => { setPhonePrefix(opt.code); setPrefixOpen(false); }}
+                  onPress={() => { setEditPhonePrefix(opt.code); setPrefixOpen(false); }}
                 >
                   <Text style={styles.prefixFlag}>{opt.flag}</Text>
-                  <Text style={[styles.prefixCode, phonePrefix === opt.code && styles.prefixCodeActive]}>
+                  <Text style={[styles.prefixCode, editPhonePrefix === opt.code && styles.prefixCodeActive]}>
                     {opt.code}
                   </Text>
-                  <Text style={[styles.prefixCountry, phonePrefix === opt.code && styles.prefixCountryActive]}>
+                  <Text style={[styles.prefixCountry, editPhonePrefix === opt.code && styles.prefixCountryActive]}>
                     {opt.country}
                   </Text>
-                  {phonePrefix === opt.code ? (
+                  {editPhonePrefix === opt.code ? (
                     <MaterialCommunityIcons name="check" size={18} color={HEADER_COLOR} />
                   ) : null}
                 </TouchableOpacity>
@@ -633,7 +695,6 @@ export default function EditProfile() {
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }

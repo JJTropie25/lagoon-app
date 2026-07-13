@@ -33,9 +33,12 @@ import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 
 const CATEGORY_COLORS_MAP: Record<string, string> = {
-  rest: "#1A4F8A",
-  shower: "#5BB5CC",
+  rest:    "#1A4F8A",
+  shower:  "#5BB5CC",
   storage: "#C8930A",
+  focus:   "#C62828",
+  tavolo:  "#C2185B",
+  charge:  "#2E7D32",
 };
 
 export default function SearchResults() {
@@ -117,21 +120,12 @@ export default function SearchResults() {
   const normalizedCategory = useMemo(() => {
     if (!microservice) return null;
     const value = String(microservice).toLowerCase();
-    if (value.includes("rest") || value.includes(t("category.rest").toLowerCase())) {
-      return "rest";
-    }
-    if (
-      value.includes("shower") ||
-      value.includes(t("category.shower").toLowerCase())
-    ) {
-      return "shower";
-    }
-    if (
-      value.includes("storage") ||
-      value.includes(t("category.storage").toLowerCase())
-    ) {
-      return "storage";
-    }
+    if (value.includes("rest")    || value.includes(t("category.rest").toLowerCase()))    return "rest";
+    if (value.includes("shower")  || value.includes(t("category.shower").toLowerCase()))  return "shower";
+    if (value.includes("focus")   || value.includes(t("category.focus").toLowerCase()))   return "focus";
+    if (value.includes("tavolo")  || value.includes(t("category.tavolo").toLowerCase()))  return "tavolo";
+    if (value.includes("charge")  || value.includes(t("category.charge").toLowerCase()))  return "charge";
+    if (value.includes("storage") || value.includes(t("category.storage").toLowerCase())) return "storage";
     return null;
   }, [microservice, t]);
 

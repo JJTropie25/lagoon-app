@@ -69,6 +69,8 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: t("tabs.profile"),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ unmountOnBlur: true } as any),
           tabBarIcon: ({ size, focused, color }) => (
             <MaterialCommunityIcons
               name={focused ? "account-circle" : "account-circle-outline"}

@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Image, Pressable, ScrollView } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,9 +20,8 @@ function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.screenBackground },
 
-    // Teal header
+    // Gradient header
     headerSection: {
-      backgroundColor: TEAL,
       paddingHorizontal: 20,
       paddingBottom: 28,
     },
@@ -75,7 +75,7 @@ function makeStyles(c: ThemeColors) {
       paddingHorizontal: 20,
       paddingVertical: 15,
       gap: 14,
-      backgroundColor: c.screenBackground,
+      backgroundColor: "transparent",
     },
     listRowLabel: {
       flex: 1,
@@ -142,6 +142,9 @@ export default function Profile() {
   const dialog = useAppDialog();
   const { user } = useAuthState();
   const { colors, mode, setMode } = useTheme();
+  const gradientColors = mode === "dark"
+    ? ["#051F1F", "#0B3F3F"] as const
+    : ["#A5D3D3", "#4F9B9B"] as const;
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [hasHostMode, setHasHostMode] = useState(false);
@@ -191,10 +194,22 @@ export default function Profile() {
 
   return (
     <View style={styles.screen}>
-      <TabTopNotch />
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
+      <TabTopNotch transparent />
 
-      {/* Teal header — paddingTop clears status bar + notch (48px) */}
-      <View style={[styles.headerSection, { paddingTop: insets.top + 72 }]}>
+      {/* Gradient header */}
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={[styles.headerSection, { paddingTop: insets.top + 72 }]}
+      >
         {user ? (
           <View style={styles.profileRow}>
             <Image
@@ -228,10 +243,10 @@ export default function Profile() {
             <Text style={styles.signInText}>{t("auth.signInAction")}</Text>
           </Pressable>
         )}
-      </View>
+      </LinearGradient>
 
       {/* Scrollable list */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
 
         {/* Payment Methods */}
         <Pressable

@@ -7,6 +7,7 @@ import {
   Linking,
   Image,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,7 +22,22 @@ import { useAppDialog } from "../components/AppDialogProvider";
 import { parseFirstImageUrl } from "../lib/services";
 
 const HEADER_COLOR = "#4F9B9B";
+const TEAL = "#4F9B9B";
+const TEAL_BG = "#EAF4F4";
+const GREEN = "#2A7A3A";
+const GREEN_BG = "#EBF5EC";
 const DANGER_COLOR = "#B94040";
+
+type Step = {
+  icon: string;
+  color: string;
+  bg: string;
+  label: string;
+  sublabel?: string;
+  isLast?: boolean;
+  content?: React.ReactNode;
+  fullWidthContent?: React.ReactNode;
+};
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
@@ -49,47 +65,140 @@ function makeStyles(c: ThemeColors) {
       color: "#fff",
     },
 
-    content: { paddingHorizontal: 16 },
-    section: { paddingVertical: 16 },
-    divider: { height: 1, backgroundColor: c.divider },
+    scroll: { paddingHorizontal: 16 },
 
-    serviceImage: {
-      width: "100%", height: 140,
-      borderRadius: 10,
+    heroImage: {
+      width: "100%", height: 170,
+      borderRadius: 14,
       backgroundColor: c.border,
-      marginBottom: 12,
+      marginBottom: 14,
     },
-    serviceName: {
-      fontSize: 20, fontWeight: "700",
+    heroName: {
+      fontSize: 22, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
       color: c.textPrimary,
-      marginBottom: 10,
+      marginBottom: 6,
     },
-    infoRow: {
-      flexDirection: "row", alignItems: "center",
-      gap: 8, marginBottom: 8,
+    heroPills: {
+      flexDirection: "row", gap: 10,
+      flexWrap: "wrap", marginBottom: 4,
     },
-    infoText: { color: c.textSecondary, fontSize: 14, flex: 1 },
+    pill: {
+      flexDirection: "row", alignItems: "center", gap: 5,
+      backgroundColor: c.surfaceSoft, borderRadius: 8,
+      paddingHorizontal: 10, paddingVertical: 5,
+    },
+    pillText: { fontSize: 13, color: c.textSecondary, fontWeight: "600" },
 
-    qrLabel: {
+    divider: { height: 1, backgroundColor: c.divider, marginVertical: 20 },
+
+    // Timeline
+    timeline: { paddingLeft: 4 },
+    timelineRow: { flexDirection: "row", gap: 14 },
+    timelineLeft: { width: 32, alignItems: "center" },
+    timelineDot: {
+      width: 32, height: 32, borderRadius: 16,
+      alignItems: "center", justifyContent: "center",
+    },
+    timelineLine: { flex: 1, width: 2, marginTop: 4 },
+    timelineRight: { flex: 1, paddingBottom: 28 },
+    stepLabel: {
       fontSize: 15, fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
-      color: c.textPrimary,
+      color: c.textPrimary, marginTop: 4,
+    },
+    stepSublabel: { fontSize: 13, color: c.textSecondary, marginTop: 3, lineHeight: 18 },
+
+    // Directions button (inside timeline)
+    dirBtn: {
+      marginTop: 10,
+      flexDirection: "row", alignItems: "center", gap: 10,
+      backgroundColor: TEAL, borderRadius: 14,
+      paddingHorizontal: 16, paddingVertical: 13,
+      shadowColor: TEAL,
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    },
+    dirBtnText: { flex: 1, fontSize: 14, fontWeight: "700", color: "#fff" },
+
+    // QR card
+    qrCard: {
+      marginTop: 12,
+      marginLeft: -4,
+      backgroundColor: c.listBackground,
+      borderRadius: 20,
+      paddingTop: 24,
+      paddingBottom: 20,
+      paddingHorizontal: 24,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 5,
+    },
+    qrCardTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: TEAL,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
       marginBottom: 16,
     },
-    qrCenter: { alignItems: "center" },
-    qrPlaceholder: { color: c.textSecondary, fontWeight: "600" },
+    qrDivider: {
+      marginTop: 20,
+      width: "100%",
+      height: 1,
+      backgroundColor: c.border,
+      opacity: 0.5,
+    },
+    qrCardHint: {
+      marginTop: 12,
+      fontSize: 12,
+      color: c.textMuted,
+      textAlign: "center",
+      letterSpacing: 0.3,
+    },
+    qrPlaceholder: { color: c.textMuted, fontWeight: "600", paddingVertical: 40 },
 
+    // Fixed bottom action bar
+    actionBar: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      backgroundColor: c.screenBackground,
+      borderTopWidth: 1,
+      borderTopColor: c.divider,
+      gap: 10,
+    },
     btn: {
-      height: 50, borderRadius: 12,
+      height: 50, borderRadius: 14,
       justifyContent: "center", alignItems: "center",
       paddingHorizontal: 12,
-      marginBottom: 10,
     },
-    btnFilled: { backgroundColor: c.warmAccent },
-    btnReview: { backgroundColor: c.warmAccentDark },
-    btnDanger: { borderWidth: 1.5, borderColor: DANGER_COLOR, backgroundColor: "transparent" },
-    btnText: { fontWeight: "600", fontSize: 14, color: "#fff" },
+    btnFilled: {
+      backgroundColor: TEAL,
+      shadowColor: TEAL,
+      shadowOpacity: 0.28,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    },
+    btnReview: {
+      backgroundColor: c.warmAccent,
+      shadowColor: c.warmAccent,
+      shadowOpacity: 0.28,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    },
+    btnDanger: {
+      borderWidth: 1.5,
+      borderColor: DANGER_COLOR,
+      backgroundColor: "transparent",
+    },
+    btnText: { fontWeight: "700", fontSize: 14, color: "#fff" },
     btnTextDanger: { color: DANGER_COLOR, fontWeight: "600", fontSize: 14 },
     btnDisabled: { opacity: 0.5 },
   });
@@ -100,16 +209,21 @@ export default function ManageBooking() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const dialog = useAppDialog();
-  const { destination, timeslot, people, microservice, from, bookingId, qrToken } =
-    useLocalSearchParams<{
-      destination?: string;
-      timeslot?: string;
-      people?: string;
-      microservice?: string;
-      from?: string;
-      bookingId?: string;
-      qrToken?: string;
-    }>();
+  const {
+    destination, timeslot, people, microservice, from, bookingId, qrToken,
+    latitude: latParam, longitude: lngParam,
+  } = useLocalSearchParams<{
+    destination?: string;
+    timeslot?: string;
+    people?: string;
+    microservice?: string;
+    from?: string;
+    bookingId?: string;
+    qrToken?: string;
+    latitude?: string;
+    longitude?: string;
+  }>();
+
   const [token, setToken] = useState<string | null>(qrToken ?? null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [hostPhone, setHostPhone] = useState<string | null>(null);
@@ -117,8 +231,11 @@ export default function ManageBooking() {
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [hasReview, setHasReview] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [serviceLatitude, setServiceLatitude] = useState<number | null>(null);
+  const [serviceLongitude, setServiceLongitude] = useState<number | null>(null);
   const { user } = useAuthState();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -144,7 +261,7 @@ export default function ManageBooking() {
     if (!supabase || !bookingId) return;
     supabase
       .from("bookings")
-      .select("qr_token, slot_start, service_id, service:services(image_url)")
+      .select("qr_token, slot_start, service_id, payment_status, service:services(image_url, latitude, longitude)")
       .eq("id", bookingId)
       .single()
       .then(({ data }) => {
@@ -152,8 +269,11 @@ export default function ManageBooking() {
         if (data?.qr_token) setToken(data.qr_token);
         setSlotStart(data?.slot_start ?? null);
         setServiceId(data?.service_id ?? null);
+        setPaymentStatus(data?.payment_status ?? null);
         const svc = Array.isArray(data?.service) ? (data.service as any[])[0] : (data?.service as any);
         if (svc?.image_url) setImageUrl(parseFirstImageUrl(svc.image_url));
+        if (svc?.latitude != null) setServiceLatitude(svc.latitude);
+        if (svc?.longitude != null) setServiceLongitude(svc.longitude);
       });
     return () => { isMounted = false; };
   }, [bookingId]);
@@ -221,6 +341,88 @@ export default function ManageBooking() {
   }, [bookingId]);
 
   const isExpired = slotStart ? new Date(slotStart).getTime() < Date.now() : false;
+  const isPaid = !paymentStatus || paymentStatus === "paid" || paymentStatus === "succeeded";
+  const headerH = insets.top + 52;
+
+  const formattedDate = useMemo(() => {
+    const src = slotStart ?? timeslot ?? null;
+    if (!src) return null;
+    const d = new Date(src);
+    if (Number.isNaN(d.getTime())) return src;
+    return d.toLocaleString("it-IT", {
+      weekday: "short", day: "numeric", month: "long",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }, [slotStart, timeslot]);
+
+  const dirLat = serviceLatitude != null ? String(serviceLatitude) : (latParam ?? undefined);
+  const dirLng = serviceLongitude != null ? String(serviceLongitude) : (lngParam ?? undefined);
+
+  const steps: Step[] = useMemo(() => [
+    {
+      icon: "check-circle",
+      color: GREEN,
+      bg: GREEN_BG,
+      label: "Booking confermato",
+      sublabel: formattedDate ?? timeslot ?? "-",
+    },
+    {
+      icon: isPaid ? "credit-card-check-outline" : "credit-card-clock-outline",
+      color: isPaid ? GREEN : "#C8930A",
+      bg: isPaid ? GREEN_BG : "#FEF3E2",
+      label: "Pagamento",
+      sublabel: isPaid ? "Confermato" : "In attesa di conferma",
+    },
+    {
+      icon: "map-marker-radius-outline",
+      color: TEAL,
+      bg: TEAL_BG,
+      label: "Raggiungi la struttura",
+      sublabel: destination ?? "-",
+      content: !isExpired ? (
+        <Pressable
+          style={styles.dirBtn}
+          onPress={() =>
+            router.push({
+              pathname: "/Directions",
+              params: {
+                microservice: microservice,
+                destination: destination,
+                timeslot: timeslot,
+                latitude: dirLat,
+                longitude: dirLng,
+              },
+            })
+          }
+        >
+          <MaterialCommunityIcons name="navigation-variant-outline" size={18} color="#fff" />
+          <Text style={styles.dirBtnText}>Indicazioni stradali</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.7)" />
+        </Pressable>
+      ) : undefined,
+    },
+    {
+      icon: "qrcode-scan",
+      color: TEAL,
+      bg: TEAL_BG,
+      label: "Check-in",
+      sublabel: "Mostra il codice QR all'ingresso",
+      isLast: true,
+      fullWidthContent: (
+        <View style={styles.qrCard}>
+          <Text style={styles.qrCardTitle}>{t("booking.accessQr")}</Text>
+          {token ? (
+            <QRCode value={token} size={180} />
+          ) : (
+            <Text style={styles.qrPlaceholder}>{t("booking.qrCode")}</Text>
+          )}
+          <View style={styles.qrDivider} />
+          <Text style={styles.qrCardHint}>Scansionato dallo staff all'ingresso</Text>
+        </View>
+      ),
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [formattedDate, timeslot, isPaid, destination, isExpired, token, dirLat, dirLng, microservice, styles]);
 
   const handleBack = () => {
     if (from === "bookings") {
@@ -270,7 +472,6 @@ export default function ManageBooking() {
         .eq("id", idToUse as any)
         .eq("guest_id", activeUserId)
         .select("*");
-      console.log("ManageBooking: delete result", { data, error });
       if (error) { setCanceling(false); await dialog.alert(t("booking.cancel"), error.message); return; }
       if (Array.isArray(data) && data.length > 0) { setCanceling(false); router.replace("/(tabs)/bookings"); return; }
       const { data: verify, error: verifyErr } = await supabase
@@ -305,10 +506,17 @@ export default function ManageBooking() {
     await Linking.openURL(url);
   };
 
-  const headerH = insets.top + 52;
-
   return (
     <View style={styles.screen}>
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
+
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.headerBtn} onPress={handleBack}>
           <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
@@ -317,77 +525,89 @@ export default function ManageBooking() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: headerH + 8, paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: headerH + 16, paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Service info */}
-        <View style={styles.section}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.serviceImage} resizeMode="cover" />
+        {/* Hero */}
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
+        ) : null}
+        <Text style={styles.heroName}>{microservice ?? "-"}</Text>
+        <View style={styles.heroPills}>
+          {destination ? (
+            <View style={styles.pill}>
+              <MaterialCommunityIcons name="map-marker-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.pillText} numberOfLines={1}>{destination}</Text>
+            </View>
           ) : null}
-          <Text style={styles.serviceName}>{microservice ?? "-"}</Text>
-          <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>{timeslot ?? "-"}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>{destination ?? "-"}</Text>
-          </View>
-          <View style={[styles.infoRow, { marginBottom: 0 }]}>
-            <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>{people ?? "-"}</Text>
-          </View>
+          {timeslot ? (
+            <View style={styles.pill}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.pillText}>{timeslot}</Text>
+            </View>
+          ) : null}
         </View>
+
         <View style={styles.divider} />
 
-        {/* QR Code */}
-        <View style={styles.section}>
-          <Text style={styles.qrLabel}>{t("booking.accessQr")}</Text>
-          <View style={styles.qrCenter}>
-            {token ? (
-              <QRCode value={token} size={180} />
-            ) : (
-              <Text style={styles.qrPlaceholder}>{t("booking.qrCode")}</Text>
-            )}
-          </View>
-        </View>
-        <View style={styles.divider} />
-
-        {/* Actions */}
-        <View style={styles.section}>
-          {isExpired ? (
-            <Pressable
-              style={[styles.btn, styles.btnReview, hasReview && styles.btnDisabled]}
-              onPress={() => {
-                if (!bookingId || !serviceId) return;
-                router.push({
-                  pathname: "/LeaveReview",
-                  params: { bookingId, serviceId, microservice, destination, timeslot },
-                });
-              }}
-              disabled={hasReview}
-            >
-              <Text style={styles.btnText}>
-                {hasReview ? t("review.alreadySubmitted") : t("review.leave")}
-              </Text>
-            </Pressable>
-          ) : (
-            <>
-              <Pressable style={[styles.btn, styles.btnFilled]} onPress={handleContact}>
-                <Text style={styles.btnText}>{t("booking.contact")}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.btn, styles.btnDanger, canceling && styles.btnDisabled]}
-                onPress={handleCancel}
-                disabled={canceling}
-              >
-                <Text style={styles.btnTextDanger}>{t("booking.cancel")}</Text>
-              </Pressable>
-            </>
-          )}
+        {/* Timeline */}
+        <View style={styles.timeline}>
+          {steps.map((step, i) => (
+            <View key={i}>
+              <View style={styles.timelineRow}>
+                <View style={styles.timelineLeft}>
+                  <View style={[styles.timelineDot, { backgroundColor: step.bg }]}>
+                    <MaterialCommunityIcons name={step.icon as any} size={17} color={step.color} />
+                  </View>
+                  {!step.isLast && (
+                    <View style={[styles.timelineLine, { backgroundColor: colors.divider }]} />
+                  )}
+                </View>
+                <View style={styles.timelineRight}>
+                  <Text style={styles.stepLabel}>{step.label}</Text>
+                  {step.sublabel ? <Text style={styles.stepSublabel}>{step.sublabel}</Text> : null}
+                  {step.content ?? null}
+                </View>
+              </View>
+              {step.fullWidthContent ?? null}
+            </View>
+          ))}
         </View>
       </ScrollView>
+
+      {/* Fixed action bar */}
+      <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
+        {isExpired ? (
+          <Pressable
+            style={[styles.btn, styles.btnReview, hasReview && styles.btnDisabled]}
+            onPress={() => {
+              if (!bookingId || !serviceId) return;
+              router.push({
+                pathname: "/LeaveReview",
+                params: { bookingId, serviceId, microservice, destination, timeslot },
+              });
+            }}
+            disabled={hasReview}
+          >
+            <Text style={styles.btnText}>
+              {hasReview ? t("review.alreadySubmitted") : t("review.leave")}
+            </Text>
+          </Pressable>
+        ) : (
+          <>
+            <Pressable style={[styles.btn, styles.btnFilled]} onPress={handleContact}>
+              <Text style={styles.btnText}>{t("booking.contact")}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.btnDanger, canceling && styles.btnDisabled]}
+              onPress={handleCancel}
+              disabled={canceling}
+            >
+              <Text style={styles.btnTextDanger}>{t("booking.cancel")}</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
     </View>
   );
 }

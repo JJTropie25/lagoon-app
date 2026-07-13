@@ -16,6 +16,7 @@ import ServiceCard from "../../../components/ServiceCard";
 import UIDateTimeField from "../../../components/UIDateTimeField";
 import TabTopNotch from "../../../components/TabTopNotch";
 import LocationPickerModal from "../../../components/LocationPickerModal";
+import { LinearGradient } from "expo-linear-gradient";
 import { useI18n } from "../../../lib/i18n";
 import { useTheme } from "../../../lib/theme-context";
 import { type ThemeColors } from "../../../lib/theme";
@@ -37,6 +38,9 @@ const CATEGORY_COLORS: Record<string, { active: string }> = {
   rest:    { active: "#1A4F8A" },
   shower:  { active: "#5BB5CC" },
   storage: { active: "#C8930A" },
+  focus:   { active: "#C62828" },
+  tavolo:  { active: "#C2185B" },
+  charge:  { active: "#2E7D32" },
 };
 
 
@@ -56,7 +60,8 @@ function makeStyles(c: ThemeColors) {
       shadowOffset: { width: 0, height: 6 },
       elevation: 6,
     },
-    categoryRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
+    categoryGrid: { gap: 8, marginBottom: 4 },
+    categoryRow: { flexDirection: "row", gap: 8 },
     catBtn: {
       flex: 1,
       height: 64,
@@ -154,13 +159,16 @@ export default function GuestHome() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { user } = useAuthState();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const categories = [
-    { key: "rest",    label: t("category.rest"),    icon: "bed-king" },
-    { key: "shower",  label: t("category.shower"),  icon: "shower"   },
-    { key: "storage", label: t("category.storage"), icon: "locker"   },
+    { key: "rest",    label: t("category.rest"),    icon: "bed-king"             },
+    { key: "shower",  label: t("category.shower"),  icon: "shower"               },
+    { key: "storage", label: t("category.storage"), icon: "locker"               },
+    { key: "focus",   label: t("category.focus"),   icon: "laptop"               },
+    { key: "tavolo",  label: t("category.tavolo"),  icon: "silverware-fork-knife"},
+    { key: "charge",  label: t("category.charge"),  icon: "lightning-bolt"       },
   ];
 
   const [microservice, setMicroservice] = useState("");
@@ -364,6 +372,13 @@ export default function GuestHome() {
     <SafeAreaView style={styles.screen}>
       <TabTopNotch />
 
+      <LinearGradient
+        colors={mode === "dark" ? ["#051F1F", "#0B3F3F"] : ["#A5D3D3", "#FFFFFF"]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.55 }}
+        pointerEvents="none"
+      />
       <LocationPickerModal
         visible={locationModalOpen}
         onClose={() => setLocationModalOpen(false)}
@@ -379,42 +394,46 @@ export default function GuestHome() {
         <Text style={styles.sectionTitle}>{t("home.tagline")}</Text>
 
         <View style={[styles.card, { backgroundColor: cardBg }]}>
-          <View style={styles.categoryRow}>
-            {categories.map(cat => {
-              const selected = microservice === cat.label;
-              return (
-                <TouchableOpacity
-                  key={cat.key}
-                  style={[
-                    styles.catBtn,
-                    selected
-                      ? { backgroundColor: isColored ? "#fff" : CATEGORY_COLORS[cat.key].active }
-                      : { backgroundColor: catUnselBg },
-                  ]}
-                  onPress={() => {
-                    setMicroservice(selected ? "" : cat.label);
-                    setSearchWarning(null);
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name={cat.icon as any}
-                    size={20}
-                    color={selected ? (isColored ? accentColor : "#fff") : onCard}
-                  />
-                  <Text
-                    style={[
-                      styles.catLabel,
-                      { color: selected ? (isColored ? accentColor : "#fff") : onCard },
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                  >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.categoryGrid}>
+            {[categories.slice(0, 3), categories.slice(3, 6)].map((row, rowIdx) => (
+              <View key={rowIdx} style={styles.categoryRow}>
+                {row.map(cat => {
+                  const selected = microservice === cat.label;
+                  return (
+                    <TouchableOpacity
+                      key={cat.key}
+                      style={[
+                        styles.catBtn,
+                        selected
+                          ? { backgroundColor: isColored ? "#fff" : CATEGORY_COLORS[cat.key].active }
+                          : { backgroundColor: catUnselBg },
+                      ]}
+                      onPress={() => {
+                        setMicroservice(selected ? "" : cat.label);
+                        setSearchWarning(null);
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={cat.icon as any}
+                        size={20}
+                        color={selected ? (isColored ? accentColor : "#fff") : onCard}
+                      />
+                      <Text
+                        style={[
+                          styles.catLabel,
+                          { color: selected ? (isColored ? accentColor : "#fff") : onCard },
+                        ]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                      >
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
 
           <View style={[styles.divider, { backgroundColor: onDivider }]} />
