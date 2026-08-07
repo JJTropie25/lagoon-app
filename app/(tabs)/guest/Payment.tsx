@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { analytics } from "../../../lib/analytics";
 import {
   View,
   Text,
@@ -145,6 +146,20 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: c.warmAccent,
     },
 
+    tcRow: {
+      flexDirection: "row", alignItems: "flex-start",
+      gap: 12, marginBottom: 16,
+    },
+    tcCheckBox: {
+      width: 22, height: 22, borderRadius: 6,
+      borderWidth: 2, borderColor: c.border,
+      alignItems: "center", justifyContent: "center",
+      marginTop: 1, flexShrink: 0,
+    },
+    tcCheckBoxChecked: { backgroundColor: c.warmAccent, borderColor: c.warmAccent },
+    tcLabel: { flex: 1, fontSize: 12, lineHeight: 18, color: c.textSecondary },
+    tcLabelLink: { color: c.warmAccent, fontWeight: "700" },
+
     bookBar: {
       paddingHorizontal: 16, paddingTop: 12,
       backgroundColor: c.screenBackground,
@@ -154,9 +169,9 @@ function makeStyles(c: ThemeColors) {
       padding: 16, backgroundColor: c.warmAccent,
       borderRadius: 14, alignItems: "center",
       shadowColor: c.warmAccent,
+      shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.30,
       shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
       elevation: 4,
     },
     payButtonDisabled: {
@@ -213,8 +228,20 @@ export default function Payment() {
 
   const headerColor = (category && CATEGORY_COLORS[category]) ?? DEFAULT_HEADER_COLOR;
 
+  const flowTrackedRef = useRef(false);
+  useEffect(() => {
+    if (flowTrackedRef.current || !serviceId) return;
+    flowTrackedRef.current = true;
+    analytics.bookingFlowStarted({
+      service_id: serviceId,
+      microservice: microservice ?? null,
+      category: category ?? null,
+    });
+  }, [serviceId, microservice, category]);
+
   const [method, setMethod] = useState<"card" | "cash">("cash");
   const [processing, setProcessing] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [priceEur, setPriceEur] = useState<number | null>(null);
   const [loadingPrice, setLoadingPrice] = useState(false);
   const [serviceImageUrl, setServiceImageUrl] = useState<string | null>(null);
@@ -324,8 +351,9 @@ export default function Payment() {
           slot_end: slot.end,
           people_count: peopleCount,
           qr_token: slotQrToken,
+          status: method === "card" ? "pending_payment" : "confirmed",
           payment_intent_id: paymentIntentId,
-          payment_status: method === "card" ? "paid" : "cash",
+          payment_status: method === "card" ? "pending" : "cash",
           amount_cents: amountCentsPerSlot ?? (priceEur != null ? Math.round(priceEur * 100) : null),
           platform_fee_cents: platformFeeCentsPerSlot,
           currency: "eur",
@@ -345,6 +373,13 @@ export default function Payment() {
     }
 
     setProcessing(false);
+    analytics.bookingCompleted({
+      service_id: serviceId ?? "",
+      microservice: microservice ?? null,
+      method,
+      slot_count: parsedSlots.length,
+      total_eur: totalPriceEur,
+    });
     const slotTimesStr = parsedSlots.map(s => s.hour).join(', ');
     router.replace({
       pathname: "/(tabs)/guest/BookingConfirmation",
@@ -463,15 +498,27 @@ export default function Payment() {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* T&C acceptance */}
+        <TouchableOpacity style={styles.tcRow} onPress={() => setTermsAccepted(v => !v)} activeOpacity={0.8}>
+          <View style={[styles.tcCheckBox, termsAccepted && styles.tcCheckBoxChecked]}>
+            {termsAccepted && <MaterialCommunityIcons name="check" size={13} color="#fff" />}
+          </View>
+          <Text style={styles.tcLabel}>
+            Il contratto di servizio intercorre direttamente tra me e l'host erogatore;{" "}
+            <Text style={styles.tcLabelLink}>Lagoon agisce esclusivamente come intermediario tecnologico.</Text>
+            {" "}Ho letto e accetto i termini del servizio.
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
 
       {/* Fixed pay button */}
       <View style={[styles.bookBar, { paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
-          style={[styles.payButton, processing && styles.payButtonDisabled]}
+          style={[styles.payButton, (processing || !termsAccepted) && styles.payButtonDisabled]}
           onPress={handlePay}
-          disabled={processing}
+          disabled={processing || !termsAccepted}
         >
           <Text style={styles.payButtonText}>
             {processing ? t("payment.processing") : t("payment.payNow")}

@@ -132,6 +132,12 @@ function makeStyles(c: ThemeColors) {
       fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
     },
+    guestHint: {
+      fontSize: 13,
+      color: c.textSecondary,
+      textAlign: "center",
+      lineHeight: 19,
+    },
   });
 }
 
@@ -176,7 +182,7 @@ export default function Profile() {
   );
 
   const handleHost = async () => {
-    if (!user) return;
+    if (!user) { router.push("/(auth)/sign-in?continue=1"); return; }
     if (!hasHostMode) {
       setBecomingHost(true);
       const displayName = user.user_metadata?.username ?? user.email ?? "Host";
@@ -251,7 +257,7 @@ export default function Profile() {
         {/* Payment Methods */}
         <Pressable
           style={styles.listRow}
-          onPress={() => router.push("/(tabs)/profile/Payments")}
+          onPress={() => user ? router.push("/(tabs)/profile/Payments") : router.push("/(auth)/sign-in?continue=1")}
         >
           <MaterialCommunityIcons name="credit-card-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Payment Methods</Text>
@@ -315,9 +321,8 @@ export default function Profile() {
 
       </ScrollView>
 
-      {/* Bottom: Host button */}
-      {user ? (
-        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomSection, { paddingBottom: 16 }]}>
+        {user ? (
           <Pressable
             style={[styles.hostButton, becomingHost && { opacity: 0.6 }]}
             onPress={handleHost}
@@ -327,8 +332,12 @@ export default function Profile() {
               {becomingHost ? "…" : t("edit.switchHostMode")}
             </Text>
           </Pressable>
-        </View>
-      ) : null}
+        ) : (
+          <Text style={styles.guestHint}>
+            Sign in to book as a guest and publish listings as a host.
+          </Text>
+        )}
+      </View>
 
     </View>
   );

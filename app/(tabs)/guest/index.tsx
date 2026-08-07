@@ -61,6 +61,24 @@ function makeStyles(c: ThemeColors) {
       elevation: 6,
     },
     categoryGrid: { gap: 8, marginBottom: 4 },
+    categoryInfoBox: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginTop: 10,
+      marginBottom: 2,
+      backgroundColor: "rgba(255,255,255,0.18)",
+    },
+    categoryInfoText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 18,
+      color: "rgba(255,255,255,0.92)",
+      fontStyle: "italic",
+    },
     categoryRow: { flexDirection: "row", gap: 8 },
     catBtn: {
       flex: 1,
@@ -369,7 +387,7 @@ export default function GuestHome() {
   );
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <TabTopNotch />
 
       <LinearGradient
@@ -435,6 +453,15 @@ export default function GuestHome() {
               </View>
             ))}
           </View>
+
+          {activeCategoryKey && (
+            <View style={styles.categoryInfoBox}>
+              <MaterialCommunityIcons name="information-outline" size={15} color="rgba(255,255,255,0.85)" style={{ marginTop: 1 }} />
+              <Text style={styles.categoryInfoText} numberOfLines={4}>
+                {t(`category.req.${activeCategoryKey}`)}
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.divider, { backgroundColor: onDivider }]} />
 

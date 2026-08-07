@@ -47,10 +47,10 @@ export default function HostScanQr() {
     if (supabase && bookingId) {
       await supabase
         .from("bookings")
-        .update({ checked_in_at: new Date().toISOString() })
+        .update({ checked_in_at: new Date().toISOString(), status: "checked_in" })
         .eq("id", bookingId);
     }
-    router.replace({ pathname: "/(host)/check-in-confirmed", params: { bookingId } });
+    router.replace({ pathname: "/(host)/check-in-confirmed", params: { bookingId, mode: "checkin" } });
   };
 
   return (

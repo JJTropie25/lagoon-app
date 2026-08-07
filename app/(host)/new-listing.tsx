@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BrandedLoader from "../../components/BrandedLoader";
 import {
   Image,
@@ -43,8 +43,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   tavolo:  "silverware-fork-knife",
   charge:  "lightning-bolt",
 };
-const SLOT_OPTIONS = Array.from({ length: 18 }, (_, i) => {
-  const h = 9 + Math.floor(i / 2);
+const SLOT_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
   const m = i % 2 === 0 ? "00" : "30";
   return `${String(h).padStart(2, "0")}:${m}`;
 });
@@ -121,6 +121,14 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: "rgba(0,0,0,0.5)",
       borderRadius: 12,
       width: 26, height: 26,
+      alignItems: "center", justifyContent: "center",
+    },
+    addMoreBtn: {
+      position: "absolute",
+      bottom: 10, right: 10,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      borderRadius: 16,
+      width: 32, height: 32,
       alignItems: "center", justifyContent: "center",
     },
 
@@ -223,6 +231,7 @@ function makeStyles(c: ThemeColors) {
     },
 
     chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    slotHint: { fontSize: 12, lineHeight: 17, color: c.textMuted, marginTop: 8, fontStyle: "italic" },
     chip: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: c.surfaceSoft },
     chipSelected: { backgroundColor: c.warmAccent },
     chipText: { color: c.textSecondary, fontWeight: "700", fontSize: 13 },
@@ -299,6 +308,23 @@ export default function HostNewListing() {
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [enabledCategories, setEnabledCategories] = useState<Service["category"][]>(CATEGORIES);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    resolveHostForUser(user.id).then(({ host }) => {
+      if (host?.enabled_categories?.length) {
+        const cats = host.enabled_categories as Service["category"][];
+        setEnabledCategories(cats);
+        setCategory(prev => cats.includes(prev) ? prev : cats[0]);
+      }
+    });
+  }, [user?.id]);
+
+  const visibleCategories = useMemo(
+    () => CATEGORIES.filter(c => enabledCategories.includes(c)),
+    [enabledCategories]
+  );
 
   const [amenTowels, setAmenTowels] = useState(false);
   const [amenHairDryer, setAmenHairDryer] = useState(false);
@@ -437,33 +463,40 @@ export default function HostNewListing() {
         {/* ── Hero image gallery ───────────────── */}
         <View style={styles.galleryWrap}>
           {imageUrls.length > 0 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
-                setActiveImageIdx(Math.max(0, Math.min(idx, imageUrls.length - 1)));
-              }}
-              scrollEventThrottle={16}
-            >
-              {imageUrls.map((url, i) => (
-                <View key={i} style={{ width: screenWidth, height: IMAGE_HEIGHT }}>
-                  <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  <TouchableOpacity
-                    style={styles.removeImageBtn}
-                    onPress={() => { setImageUrls((prev) => prev.filter((_, j) => j !== i)); setActiveImageIdx(0); }}
-                  >
-                    <MaterialCommunityIcons name="close" size={14} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+            <>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+                  setActiveImageIdx(Math.max(0, Math.min(idx, imageUrls.length - 1)));
+                }}
+                scrollEventThrottle={16}
+              >
+                {imageUrls.map((url, i) => (
+                  <View key={i} style={{ width: screenWidth, height: IMAGE_HEIGHT }}>
+                    <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <TouchableOpacity
+                      style={styles.removeImageBtn}
+                      onPress={() => { setImageUrls((prev) => prev.filter((_, j) => j !== i)); setActiveImageIdx(0); }}
+                    >
+                      <MaterialCommunityIcons name="close" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              {imageUrls.length < 5 && !uploadingImage && (
+                <TouchableOpacity style={styles.addMoreBtn} onPress={onPickPhoto} activeOpacity={0.75}>
+                  <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </>
           ) : (
-            <View style={styles.galleryEmpty}>
+            <TouchableOpacity style={styles.galleryEmpty} onPress={onPickPhoto} activeOpacity={0.7} disabled={uploadingImage}>
               <MaterialCommunityIcons name="image-plus" size={40} color={colors.textMuted} />
               <Text style={styles.galleryEmptyText}>Add photos</Text>
-            </View>
+            </TouchableOpacity>
           )}
           {imageUrls.length > 1 && (
             <View style={styles.galleryDots}>
@@ -482,32 +515,22 @@ export default function HostNewListing() {
 
         <View style={[styles.content, { paddingTop: 20 }]}>
 
-          {/* Photo actions */}
+          {/* Photo count label */}
           <Text style={styles.sectionLabel}>
             {t("host.field.image")} ({imageUrls.length}/5)
           </Text>
-          <View style={styles.photoActions}>
-            <TouchableOpacity
-              style={[styles.photoBtn, (uploadingImage || imageUrls.length >= 5) && styles.photoBtnDisabled]}
-              onPress={onPickPhoto}
-              disabled={uploadingImage || imageUrls.length >= 5}
-            >
-              {uploadingImage ? (
-                <BrandedLoader size={22} color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="image-plus" size={18} color="#fff" />
-                  <Text style={styles.photoBtnText}>
-                    {imageUrls.length === 0 ? "Choose photo" : "Add another"}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          {uploadingImage && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <BrandedLoader size={18} color={HEADER_COLOR} />
+              <Text style={styles.photoHint}>Uploading...</Text>
+            </View>
+          )}
           <Text style={styles.photoHint}>
             {imageUrls.length >= 5
               ? "Maximum 5 photos reached"
-              : `${5 - imageUrls.length} slot${5 - imageUrls.length !== 1 ? "s" : ""} remaining`}
+              : imageUrls.length === 0
+              ? "Tap the image area above to add photos"
+              : `${5 - imageUrls.length} slot${5 - imageUrls.length !== 1 ? "s" : ""} remaining — tap + to add more`}
           </Text>
 
           <View style={styles.divider} />
@@ -518,7 +541,7 @@ export default function HostNewListing() {
             style={styles.input}
             value={title}
             onChangeText={setTitle}
-            placeholder="Give your listing a clear name"
+            placeholder={t("host.ph.title")}
             placeholderTextColor={colors.textMuted}
           />
 
@@ -531,7 +554,7 @@ export default function HostNewListing() {
             value={description}
             onChangeText={setDescription}
             multiline
-            placeholder="Describe the experience guests can expect…"
+            placeholder={t("host.ph.description")}
             placeholderTextColor={colors.textMuted}
           />
 
@@ -540,7 +563,7 @@ export default function HostNewListing() {
           {/* Category */}
           <Text style={styles.sectionLabel}>{t("host.field.serviceType")}</Text>
           <View style={styles.categoryGrid}>
-            {[CATEGORIES.slice(0, 3), CATEGORIES.slice(3)].map((row, ri) => (
+            {[visibleCategories.slice(0, 3), visibleCategories.slice(3)].map((row, ri) => (
               <View key={ri} style={styles.categoryRow}>
                 {row.map((item) => (
                   <TouchableOpacity
@@ -638,6 +661,7 @@ export default function HostNewListing() {
               </TouchableOpacity>
             ))}
           </View>
+          <Text style={styles.slotHint}>{t("host.field.slotsHint")}</Text>
 
           <View style={styles.divider} />
 
@@ -721,7 +745,7 @@ export default function HostNewListing() {
                     style={styles.dimensionsInput}
                     value={amenDimensions}
                     onChangeText={setAmenDimensions}
-                    placeholder="es. 60×40×30cm"
+                    placeholder={t("host.ph.dimensions")}
                     placeholderTextColor={colors.textMuted}
                   />
                 </View>
@@ -777,7 +801,7 @@ export default function HostNewListing() {
                     style={styles.dimensionsInput}
                     value={amenVoltage}
                     onChangeText={setAmenVoltage}
-                    placeholder="es. 220"
+                    placeholder={t("host.ph.voltage")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                   />
@@ -788,7 +812,7 @@ export default function HostNewListing() {
                     style={styles.dimensionsInput}
                     value={amenOutletCount}
                     onChangeText={setAmenOutletCount}
-                    placeholder="es. 4"
+                    placeholder={t("host.ph.outletCount")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                   />

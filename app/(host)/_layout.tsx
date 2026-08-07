@@ -2,7 +2,6 @@ import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../lib/i18n";
 import { useTheme } from "../../lib/theme-context";
-
 export default function HostTabsLayout() {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -63,6 +62,7 @@ export default function HostTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="onboarding"       options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="edit-listing"    options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="new-listing"     options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="reservation/[bookingId]" options={{ href: null, tabBarStyle: { display: "none" } }} />

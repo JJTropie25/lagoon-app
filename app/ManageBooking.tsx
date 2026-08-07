@@ -180,17 +180,17 @@ function makeStyles(c: ThemeColors) {
     btnFilled: {
       backgroundColor: TEAL,
       shadowColor: TEAL,
-      shadowOpacity: 0.28,
-      shadowRadius: 8,
       shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
       elevation: 4,
     },
     btnReview: {
       backgroundColor: c.warmAccent,
       shadowColor: c.warmAccent,
-      shadowOpacity: 0.28,
-      shadowRadius: 8,
       shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
       elevation: 4,
     },
     btnDanger: {
@@ -232,6 +232,8 @@ export default function ManageBooking() {
   const [hasReview, setHasReview] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [cancellationMinutes, setCancellationMinutes] = useState<number | null>(null);
   const [serviceLatitude, setServiceLatitude] = useState<number | null>(null);
   const [serviceLongitude, setServiceLongitude] = useState<number | null>(null);
   const { user } = useAuthState();
@@ -261,7 +263,7 @@ export default function ManageBooking() {
     if (!supabase || !bookingId) return;
     supabase
       .from("bookings")
-      .select("qr_token, slot_start, service_id, payment_status, service:services(image_url, latitude, longitude)")
+      .select("qr_token, slot_start, service_id, payment_status, payment_intent_id, service:services(image_url, latitude, longitude, cancellation_minutes)")
       .eq("id", bookingId)
       .single()
       .then(({ data }) => {
@@ -270,10 +272,12 @@ export default function ManageBooking() {
         setSlotStart(data?.slot_start ?? null);
         setServiceId(data?.service_id ?? null);
         setPaymentStatus(data?.payment_status ?? null);
+        setPaymentIntentId((data as any)?.payment_intent_id ?? null);
         const svc = Array.isArray(data?.service) ? (data.service as any[])[0] : (data?.service as any);
         if (svc?.image_url) setImageUrl(parseFirstImageUrl(svc.image_url));
         if (svc?.latitude != null) setServiceLatitude(svc.latitude);
         if (svc?.longitude != null) setServiceLongitude(svc.longitude);
+        if (svc?.cancellation_minutes != null) setCancellationMinutes(Number(svc.cancellation_minutes));
       });
     return () => { isMounted = false; };
   }, [bookingId]);
@@ -437,6 +441,19 @@ export default function ManageBooking() {
       await dialog.alert(t("booking.cancel"), "Unable to cancel this booking.");
       return;
     }
+
+    // Enforce cancellation window
+    if (slotStart && cancellationMinutes != null && cancellationMinutes > 0) {
+      const deadline = new Date(slotStart).getTime() - cancellationMinutes * 60 * 1000;
+      if (Date.now() > deadline) {
+        await dialog.alert(
+          t("booking.cancel"),
+          `Cancellazione non consentita: la finestra di ${cancellationMinutes} minuti prima dell'inizio è scaduta.`
+        );
+        return;
+      }
+    }
+
     const confirmed = await dialog.confirm({
       title: t("booking.cancel"),
       message: t("booking.cancelConfirm"),
@@ -454,35 +471,22 @@ export default function ManageBooking() {
         await dialog.alert(t("booking.cancel"), t("bookings.signIn") || "Please sign in to cancel bookings.");
         return;
       }
-      const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
-      const { data: fetchData, error: fetchErr } = await supabase
-        .from("bookings")
-        .select("guest_id")
-        .eq("id", idToUse as any)
-        .maybeSingle();
-      if (fetchErr) { setCanceling(false); await dialog.alert(t("booking.cancel"), fetchErr.message); return; }
-      if (!fetchData || fetchData.guest_id !== activeUserId) {
-        setCanceling(false);
-        await dialog.alert(t("booking.cancel"), t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking.");
-        return;
-      }
-      const { data, error } = await supabase
-        .from("bookings")
-        .delete()
-        .eq("id", idToUse as any)
-        .eq("guest_id", activeUserId)
-        .select("*");
-      if (error) { setCanceling(false); await dialog.alert(t("booking.cancel"), error.message); return; }
-      if (Array.isArray(data) && data.length > 0) { setCanceling(false); router.replace("/(tabs)/bookings"); return; }
-      const { data: verify, error: verifyErr } = await supabase
-        .from("bookings")
-        .select("id")
-        .eq("id", idToUse as any)
-        .maybeSingle();
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase.functions.invoke("refund-booking", {
+        body: {
+          booking_id: bookingId,
+          status: "cancelled_by_guest",
+          reason: "Guest requested cancellation",
+        },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      });
+
       setCanceling(false);
-      if (verifyErr) { await dialog.alert(t("booking.cancel"), verifyErr.message); return; }
-      if (verify?.id) {
-        await dialog.alert(t("booking.cancel"), t("booking.cancelFailed") || `Unable to delete booking ${String(idToUse)}.`);
+      if (error) {
+        await dialog.alert(t("booking.cancel"), error.message ?? String(error));
         return;
       }
       router.replace("/(tabs)/bookings");

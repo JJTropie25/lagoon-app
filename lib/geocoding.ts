@@ -85,7 +85,7 @@ async function nominatimSearch(query: string, limit: number): Promise<PlaceSugge
 // ── Public API ────────────────────────────────────────────────────────────────
 export async function searchPlaceSuggestions(query: string, limit = 6): Promise<PlaceSuggestion[]> {
   const normalized = query.trim();
-  if (normalized.length < 3) return [];
+  if (normalized.length < 2) return [];
   try {
     const results = await photonAutocomplete(normalized, limit);
     if (results.length > 0) return results;

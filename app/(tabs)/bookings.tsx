@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import LoginGate from "../../components/LoginGate";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../lib/i18n";
@@ -44,6 +45,7 @@ type BookingItem = {
   imageUrl?: string | null;
   category?: "rest" | "shower" | "storage" | null;
   slotStart: string;
+  status: string;
 };
 
 function makeStyles(c: ThemeColors) {
@@ -182,6 +184,11 @@ function makeStyles(c: ThemeColors) {
       justifyContent: "center",
       alignItems: "center",
       paddingHorizontal: 6,
+      shadowColor: c.accent,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
     btnReview: {
       backgroundColor: c.warmAccentDark,
@@ -231,7 +238,7 @@ export default function Bookings() {
       const { data } = await sb
         .from("bookings")
         .select(
-          "id, slot_start, slot_end, people_count, service:services(id, title, location, latitude, longitude, image_url, category)"
+          "id, slot_start, slot_end, people_count, status, service:services(id, title, location, latitude, longitude, image_url, category)"
         )
         .eq("guest_id", user.id)
         .order("slot_start", { ascending: false });
@@ -260,6 +267,7 @@ export default function Bookings() {
             imageUrl: parseFirstImageUrl(row.service?.image_url) ?? null,
             category: row.service?.category ?? null,
             slotStart: row.slot_start,
+            status: row.status ?? "confirmed",
           };
         });
 
@@ -291,6 +299,24 @@ export default function Bookings() {
     if (!user) return t("bookings.signIn");
     return t("bookings.empty");
   }, [t, user]);
+
+  const statusPill = (status: string) => {
+    const map: Record<string, { label: string; bg: string; color: string }> = {
+      pending_payment:    { label: "In pagamento", bg: "#E8F0FF", color: "#1A56C4" },
+      confirmed:          { label: "Confermata",   bg: "#F5E7A6", color: "#7A6010" },
+      checked_in:         { label: "Check-in",     bg: "#BFE9D2", color: "#1F6E44" },
+      completed:          { label: "Completata",   bg: "#D5E0E0", color: "#687878" },
+      cancelled_by_guest: { label: "Annullata",    bg: "#FFD6D6", color: "#B00020" },
+      cancelled_by_host:  { label: "Ann. host",    bg: "#FFD6D6", color: "#B00020" },
+    };
+    const s = map[status];
+    if (!s) return null;
+    return (
+      <View style={[styles.expiredBadge, { backgroundColor: s.bg }]}>
+        <Text style={[styles.expiredBadgeText, { color: s.color }]}>{s.label}</Text>
+      </View>
+    );
+  };
 
   const renderItem = ({ item }: { item: BookingItem }) => {
     const isExpired = new Date(item.slotStart).getTime() < Date.now();
@@ -330,7 +356,8 @@ export default function Bookings() {
                 </Text>
               </View>
             ) : null}
-            {isExpired ? (
+            {statusPill(item.status)}
+            {isExpired && item.status === "confirmed" ? (
               <View style={styles.expiredBadge}>
                 <Text style={styles.expiredBadgeText}>{t("booking.expired")}</Text>
               </View>
@@ -436,7 +463,7 @@ export default function Bookings() {
         pointerEvents="none"
       />
       <TabTopNotch />
-      <FlatList
+      {!user ? <LoginGate /> : <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
@@ -450,7 +477,7 @@ export default function Bookings() {
             : <Text style={styles.emptyText}>{emptyState}</Text>
         }
         renderItem={renderItem}
-      />
+      />}
     </View>
   );
 }

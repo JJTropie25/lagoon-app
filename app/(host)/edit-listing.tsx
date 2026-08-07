@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BrandedLoader from "../../components/BrandedLoader";
+import LoadingCard from "../../components/LoadingCard";
 import {
   Image,
   ScrollView,
@@ -50,8 +51,8 @@ const CATEGORY_ICONS: Record<string, string> = {
   charge:  "lightning-bolt",
 };
 
-const SLOT_OPTIONS = Array.from({ length: 18 }, (_, i) => {
-  const h = 9 + Math.floor(i / 2);
+const SLOT_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
   const m = i % 2 === 0 ? "00" : "30";
   return `${String(h).padStart(2, "0")}:${m}`;
 });
@@ -300,6 +301,7 @@ function makeStyles(c: ThemeColors) {
       flexWrap: "wrap",
       gap: 8,
     },
+    slotHint: { fontSize: 12, lineHeight: 17, color: c.textMuted, marginTop: 8, fontStyle: "italic" },
     chip: {
       borderRadius: 999,
       paddingHorizontal: 14,
@@ -688,6 +690,13 @@ export default function HostEditListing() {
 
   return (
     <View style={styles.screen}>
+      {/* Full-screen loading overlay — covers gallery and old state while data loads */}
+      {loading && (
+        <View style={[StyleSheet.absoluteFillObject, { zIndex: 50, backgroundColor: colors.screenBackground }]}>
+          <LoadingCard topSpacing={headerH + 48} />
+        </View>
+      )}
+
       {/* Fixed teal header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
@@ -799,7 +808,7 @@ export default function HostEditListing() {
             style={styles.input}
             value={title}
             onChangeText={setTitle}
-            placeholder="Give your listing a clear name"
+            placeholder={t("host.ph.title")}
             placeholderTextColor={colors.textMuted}
           />
 
@@ -812,7 +821,7 @@ export default function HostEditListing() {
             value={description}
             onChangeText={setDescription}
             multiline
-            placeholder="Describe the experience guests can expect…"
+            placeholder={t("host.ph.description")}
             placeholderTextColor={colors.textMuted}
           />
 
@@ -924,6 +933,7 @@ export default function HostEditListing() {
               </TouchableOpacity>
             ))}
           </View>
+          <Text style={styles.slotHint}>{t("host.field.slotsHint")}</Text>
 
           <View style={styles.divider} />
 
@@ -1057,7 +1067,7 @@ export default function HostEditListing() {
                     style={styles.dimensionsInput}
                     value={amenDimensions}
                     onChangeText={setAmenDimensions}
-                    placeholder="es. 60×40×30cm"
+                    placeholder={t("host.ph.dimensions")}
                     placeholderTextColor={colors.textMuted}
                   />
                 </View>
@@ -1113,7 +1123,7 @@ export default function HostEditListing() {
                     style={styles.dimensionsInput}
                     value={amenVoltage}
                     onChangeText={setAmenVoltage}
-                    placeholder="es. 220"
+                    placeholder={t("host.ph.voltage")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                   />
@@ -1124,7 +1134,7 @@ export default function HostEditListing() {
                     style={styles.dimensionsInput}
                     value={amenOutletCount}
                     onChangeText={setAmenOutletCount}
-                    placeholder="es. 4"
+                    placeholder={t("host.ph.outletCount")}
                     placeholderTextColor={colors.textMuted}
                     keyboardType="number-pad"
                   />
@@ -1168,7 +1178,7 @@ export default function HostEditListing() {
                           value={rs.text}
                           onChangeText={(v) => updateReplyState(review.id, { text: v })}
                           multiline
-                          placeholder="Write your reply…"
+                          placeholder={t("host.ph.reviewReply")}
                           placeholderTextColor={colors.textMuted}
                         />
                         <View style={styles.replyBtns}>

@@ -302,7 +302,7 @@ export default function HostProfile() {
       </ScrollView>
 
       {/* Bottom actions */}
-      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomSection, { paddingBottom: 16 }]}>
         <Pressable style={styles.switchBtn} onPress={() => router.replace("/(tabs)/guest")}>
           <Text style={styles.switchBtnText}>{t("host.profile.switchGuest")}</Text>
         </Pressable>

@@ -20,6 +20,19 @@ function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.screenBackground },
     container: { paddingBottom: 24 },
+    verificationBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 14,
+      borderRadius: 12,
+      backgroundColor: "#FFF8E1",
+    },
+    verificationBannerRejected: { backgroundColor: "#FFEBEE" },
+    verificationBannerText: { flex: 1, fontSize: 13, lineHeight: 18, color: "#7A5800", fontWeight: "600" },
+    verificationBannerTextRejected: { color: "#B71C1C" },
     headerBlock: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -109,6 +122,8 @@ export default function HostListings() {
   const [hostLabel, setHostLabel] = useState<string | null>(null);
   const [hasHost, setHasHost] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -120,6 +135,12 @@ export default function HostListings() {
       setLoading(false);
       return;
     }
+    if (!host.onboarding_complete) {
+      router.replace("/(host)/onboarding" as any);
+      return;
+    }
+    setVerificationStatus(host.verification_status ?? null);
+    setIsVerified(host.verification_status === "VERIFIED");
     setHostLabel(host.display_name ?? null);
     const data = await fetchHostListings(host.id);
     setListings(data);
@@ -159,10 +180,17 @@ export default function HostListings() {
               <View style={styles.headerBlock}>
                 <Text style={styles.title}>{t("host.listings.title")}</Text>
                 <TouchableOpacity
-                  style={styles.addButton}
+                  style={[styles.addButton, !isVerified && { opacity: 0.4 }]}
                   onPress={() => {
                     if (!hasHost) {
                       dialog.alert(t("host.listings.title"), t("host.notAvailable"));
+                      return;
+                    }
+                    if (!isVerified) {
+                      dialog.alert(
+                        "Profilo in verifica",
+                        "Potrai pubblicare inserzioni solo dopo che il tuo profilo sarà verificato dal team Lagoon."
+                      );
                       return;
                     }
                     router.push("/(host)/new-listing");
@@ -171,6 +199,22 @@ export default function HostListings() {
                   <MaterialCommunityIcons name="plus" size={22} color="#fff" />
                 </TouchableOpacity>
               </View>
+              {verificationStatus === "PENDING_VERIFICATION" && (
+                <View style={styles.verificationBanner}>
+                  <MaterialCommunityIcons name="clock-outline" size={20} color="#7A5800" />
+                  <Text style={styles.verificationBannerText}>
+                    Profilo in attesa di verifica. Il team Lagoon ti contatterà entro 2–3 giorni lavorativi.
+                  </Text>
+                </View>
+              )}
+              {verificationStatus === "REJECTED" && (
+                <View style={[styles.verificationBanner, styles.verificationBannerRejected]}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={20} color="#B71C1C" />
+                  <Text style={[styles.verificationBannerText, styles.verificationBannerTextRejected]}>
+                    Verifica rifiutata. Contatta il supporto Lagoon per maggiori informazioni.
+                  </Text>
+                </View>
+              )}
             </>
           }
           ListEmptyComponent={

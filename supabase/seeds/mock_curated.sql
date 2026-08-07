@@ -1,14 +1,19 @@
 ﻿-- =============================================================
--- mock_curated.sql  —  Lagoon curated testing seed  (v3)
+-- mock_curated.sql  —  Lagoon curated testing seed  (v4)
 -- Run AFTER migration 20260628100000_services_extra_columns.sql
 --
--- ~88 curated services across 9 Italian destinations.
--- Venezia has the largest selection (~22 services).
--- Each service has description, image, amenities, slots (14 days),
+-- ~118 curated services across 9 Italian destinations.
+-- Categories: rest, shower, storage, focus, tavolo, charge.
+-- Each service has description, image, amenities, slots (90 days),
 -- and 2 mock reviews.
 -- =============================================================
 
 BEGIN;
+
+-- Ensure all categories (including focus/tavolo/charge) are allowed
+ALTER TABLE public.services DROP CONSTRAINT IF EXISTS services_category_check;
+ALTER TABLE public.services ADD CONSTRAINT services_category_check
+  CHECK (category IN ('rest', 'shower', 'storage', 'focus', 'tavolo', 'charge'));
 
 -- ============================================================
 -- 1. CLEAN OLD DATA  (FK-safe order: children before parents)
@@ -17,18 +22,16 @@ BEGIN;
 -- Reviews from mock seeds
 DELETE FROM public.service_reviews WHERE booking_id IS NULL AND guest_id IS NULL;
 
--- Slots for all mock services (placeholder hosts have guest_id IS NULL)
+-- Slots for mock services only (mock hosts have guest_id IS NULL)
 DELETE FROM public.service_slots
 WHERE service_id IN (
   SELECT s.id FROM public.services s
   WHERE s.host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL)
-     OR s.description IS NULL
 );
 
--- Services from placeholder hosts + any description-less leftovers
+-- Services from mock hosts only
 DELETE FROM public.services
-WHERE host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL)
-   OR description IS NULL;
+WHERE host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL);
 
 -- Placeholder hosts (now safe — no services reference them)
 DELETE FROM public.hosts WHERE guest_id IS NULL;
@@ -963,10 +966,322 @@ INSERT INTO public.services (
   'Vicino alla Fiera del Levante e al quartiere Japigia. Ideale per eventi, congressi e fiere.',
   '["https://picsum.photos/seed/ba-depot-fiera/800/500"]',
   '{}', 15, 'around', 'b0100000-0000-0000-0000-000000000009'::uuid
+),
+
+-- ══════════════════════════════════════════════════════════════
+--  FOCUS — workspace pods  (10 services)
+-- ══════════════════════════════════════════════════════════════
+(
+  'WorkPod Rialto',
+  'focus', 12.00,
+  'Ruga Rialto 623, Venezia', 'Venezia', 'Veneto',
+  45.4380, 12.3357, 0.0, 220,
+  'Postazione di lavoro privata a due passi dal Mercato di Rialto. Scrivania, sedia ergonomica, WiFi fibra e presa 220V. Perfetta per smart-worker e nomadi digitali.',
+  '["https://picsum.photos/seed/vz-workpod-rialto/800/500"]',
+  '{"wifi":true,"power_outlet":true,"monitor":false}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Focus Corner San Marco',
+  'focus', 14.00,
+  'Calle Vallaresso 1332, Venezia', 'Venezia', 'Veneto',
+  45.4318, 12.3391, 0.0, 180,
+  'Box di lavoro silenziosi con vista sul Canal Grande. WiFi dedicato, scrivania ampia e illuminazione regolabile. Per chi lavora in viaggio.',
+  '["https://picsum.photos/seed/vz-focus-sanmarco/800/500"]',
+  '{"wifi":true,"power_outlet":true,"monitor":false}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Desk Colosseo',
+  'focus', 11.00,
+  'Via Labicana 2, Roma', 'Roma', 'Lazio',
+  41.8908, 12.4922, 0.0, 220,
+  'Workspace privato vicino al Colosseo. WiFi 1 Gbps, sedie ergonomiche e silenzio assoluto. Ideale per call e focus work.',
+  '["https://picsum.photos/seed/rm-desk-colosseo/800/500"]',
+  '{"wifi":true,"power_outlet":true,"monitor":false}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'Focus Hub Termini',
+  'focus', 10.00,
+  'Via Marsala 55, Roma', 'Roma', 'Lazio',
+  41.9008, 12.5028, 0.0, 75,
+  'Postazioni in co-working a 5 minuti da Termini. WiFi, prese e coffe station inclusa. Slot da 1 ora a mezza giornata.',
+  '["https://picsum.photos/seed/rm-focus-termini/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'WorkDesk Duomo',
+  'focus', 15.00,
+  'Via Torino 2, Milano', 'Milano', 'Lombardia',
+  45.4641, 9.1880, 4.8, 120,
+  'Postazione premium a 50 metri dal Duomo. Scrivania in legno, sedia Herman Miller e monitor esterno disponibile su richiesta. Il top del focus work milanese.',
+  '["https://picsum.photos/seed/mi-workdesk-duomo/800/500"]',
+  '{"wifi":true,"power_outlet":true,"monitor":true}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Focus Brera',
+  'focus', 13.00,
+  'Via dell''Orso 16, Milano', 'Milano', 'Lombardia',
+  45.4726, 9.1858, 4.6, 530,
+  'Workspace in stile industrial-chic nel cuore di Brera. WiFi ultraveloce, mood music, caffè incluso. Per chi lavora con stile.',
+  '["https://picsum.photos/seed/mi-focus-brera/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Studio degli Uffizi',
+  'focus', 11.00,
+  'Via dei Leoni 7, Firenze', 'Firenze', 'Toscana',
+  43.7685, 11.2562, 0.0, 180,
+  'Postazione di lavoro a due passi dagli Uffizi. WiFi, prese e ambiente raccolto. Ideale per studiosi, accademici e viaggiatori con laptop.',
+  '["https://picsum.photos/seed/fi-studio-uffizi/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000003'::uuid
+),
+(
+  'Desk Toledo',
+  'focus', 10.00,
+  'Via Chiaia 4, Napoli', 'Napoli', 'Campania',
+  40.8375, 14.2497, 0.0, 170,
+  'Workspace privato nel centro di Napoli. WiFi, illuminazione LED e silenzio garantito. A due passi da Via Toledo.',
+  '["https://picsum.photos/seed/na-desk-toledo/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000004'::uuid
+),
+(
+  'Focus Spaccanapoli',
+  'focus', 9.00,
+  'Via B. Croce 30, Napoli', 'Napoli', 'Campania',
+  40.8497, 14.2567, 0.0, 390,
+  'Piccolo workspace nel cuore storico di Napoli. Ideale per studenti e freelance. WiFi stabile e sedie comode.',
+  '["https://picsum.photos/seed/na-focus-spacca/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, NULL, 'b0100000-0000-0000-0000-000000000004'::uuid
+),
+(
+  'WorkPod Arsenale',
+  'focus', 12.00,
+  'Via Garibaldi 1100, Venezia', 'Venezia', 'Veneto',
+  45.4281, 12.3565, 0.0, 700,
+  'Postazione tranquilla nel sestiere Castello. WiFi e prese 220V. Lontano dal caos turistico, vicino alla Biennale.',
+  '["https://picsum.photos/seed/vz-workpod-arsenale/800/500"]',
+  '{"wifi":true,"power_outlet":true}',
+  30, NULL, 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+
+-- ══════════════════════════════════════════════════════════════
+--  TAVOLO — table/dining reservations  (10 services)
+-- ══════════════════════════════════════════════════════════════
+(
+  'Tavolo della Serenissima',
+  'tavolo', 8.00,
+  'Sestiere San Polo 429, Venezia', 'Venezia', 'Veneto',
+  45.4372, 12.3340, 0.0, 250,
+  'Prenota il tuo posto a sedere in un bàcaro storico a San Polo. Cicchetti e ombre di vino garantiti. Senza prenotazione rischi di restare in piedi!',
+  '["https://picsum.photos/seed/vz-tavolo-serenissima/800/500"]',
+  '{"seats":2,"outdoor":false}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Posto a Rialto',
+  'tavolo', 7.00,
+  'Campo de la Pescaria, Venezia', 'Venezia', 'Veneto',
+  45.4393, 12.3356, 0.0, 190,
+  'Tavolo riservato con vista sul Canal Grande vicino al mercato del pesce. Atmosfera veneziana autentica.',
+  '["https://picsum.photos/seed/vz-posto-rialto/800/500"]',
+  '{"seats":4,"outdoor":true}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Tavolo dei Fori',
+  'tavolo', 9.00,
+  'Via Sacra 18, Roma', 'Roma', 'Lazio',
+  41.8929, 12.4857, 0.0, 160,
+  'Posto riservato con vista sui Fori Imperiali. Pranzo o spuntino con vista sulla Roma antica. Prenotazione obbligatoria.',
+  '["https://picsum.photos/seed/rm-tavolo-fori/800/500"]',
+  '{"seats":2,"outdoor":true}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'Tavolino Trastevere',
+  'tavolo', 8.00,
+  'Vicolo del Cinque 11, Roma', 'Roma', 'Lazio',
+  41.8890, 12.4717, 0.0, 360,
+  'Posto garantito in osteria nel cuore di Trastevere. Niente code, niente stress. Cucina romana autentica.',
+  '["https://picsum.photos/seed/rm-tavolino-trastevere/800/500"]',
+  '{"seats":2,"outdoor":false}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'Tavolo Navigli',
+  'tavolo', 10.00,
+  'Alzaia Naviglio Grande 40, Milano', 'Milano', 'Lombardia',
+  45.4528, 9.1783, 4.5, 890,
+  'Posto riservato su terrazza affacciata sul Naviglio Grande. Perfetto per aperitivo o cena informale con vista sul canale.',
+  '["https://picsum.photos/seed/mi-tavolo-navigli/800/500"]',
+  '{"seats":4,"outdoor":true}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Tavolo Brera',
+  'tavolo', 9.00,
+  'Via Madonnina 7, Milano', 'Milano', 'Lombardia',
+  45.4730, 9.1845, 4.6, 560,
+  'Reservazione tavolo in bistrot di design a Brera. Menu della tradizione meneghina, vini naturali. Posto garantito anche nel weekend.',
+  '["https://picsum.photos/seed/mi-tavolo-brera/800/500"]',
+  '{"seats":2,"outdoor":false}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Posto all''Oltrarno',
+  'tavolo', 8.00,
+  'Piazza Santo Spirito 9, Firenze', 'Firenze', 'Toscana',
+  43.7651, 11.2507, 0.0, 410,
+  'Tavolo in osteria fiorentina in Oltrarno. Ribollita, pappa al pomodoro e vino locale. Prenota e siediti senza attese.',
+  '["https://picsum.photos/seed/fi-posto-oltrarno/800/500"]',
+  '{"seats":2,"outdoor":true}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000003'::uuid
+),
+(
+  'Tavolo Santa Croce',
+  'tavolo', 7.00,
+  'Borgo Santa Croce 31, Firenze', 'Firenze', 'Toscana',
+  43.7689, 11.2616, 0.0, 340,
+  'Posto in trattoria vicino a Santa Croce. Cucina toscana tradizionale, prezzi onesti, posto garantito senza fila.',
+  '["https://picsum.photos/seed/fi-tavolo-santacroce/800/500"]',
+  '{"seats":2,"outdoor":false}',
+  30, NULL, 'b0100000-0000-0000-0000-000000000003'::uuid
+),
+(
+  'Tavolo Spaccanapoli',
+  'tavolo', 7.00,
+  'Via dei Tribunali 94, Napoli', 'Napoli', 'Campania',
+  40.8513, 14.2592, 0.0, 320,
+  'Posto riservato in pizzeria storica sulla Decumano Maggiore. Pizza napoletana verace, posto garantito anche nelle ore di punta.',
+  '["https://picsum.photos/seed/na-tavolo-spacca/800/500"]',
+  '{"seats":2,"outdoor":false}',
+  30, 'recently', 'b0100000-0000-0000-0000-000000000004'::uuid
+),
+(
+  'Tavolino Chiaia',
+  'tavolo', 9.00,
+  'Piazza dei Martiri 30, Napoli', 'Napoli', 'Campania',
+  40.8347, 14.2476, 0.0, 410,
+  'Tavolo in wine bar nel quartiere chic di Chiaia. Aperitivo napoletano, salumi e formaggi locali. Niente attese.',
+  '["https://picsum.photos/seed/na-tavolino-chiaia/800/500"]',
+  '{"seats":2,"outdoor":true}',
+  30, 'around', 'b0100000-0000-0000-0000-000000000004'::uuid
+),
+
+-- ══════════════════════════════════════════════════════════════
+--  CHARGE — device charging stations  (10 services)
+-- ══════════════════════════════════════════════════════════════
+(
+  'Ricarica San Marco',
+  'charge', 3.00,
+  'Procuratie Nuove 56, Venezia', 'Venezia', 'Veneto',
+  45.4340, 12.3381, 0.0, 130,
+  'Stazione di ricarica rapida sotto i portici di San Marco. USB-A, USB-C e presa Schuko. Tieni il telefono carico mentre visiti la Basilica.',
+  '["https://picsum.photos/seed/vz-ricarica-sanmarco/800/500"]',
+  '{"usb_a":true,"usb_c":true,"schuko":true}',
+  15, 'recently', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Charge Rialto',
+  'charge', 2.50,
+  'Campo San Polo 2168, Venezia', 'Venezia', 'Veneto',
+  45.4367, 12.3313, 0.0, 310,
+  'Ricarica veloce a San Polo. 4 porte USB-C e 2 Schuko. Lascia caricare mentre fai shopping o prendi un caffè.',
+  '["https://picsum.photos/seed/vz-charge-rialto/800/500"]',
+  '{"usb_a":true,"usb_c":true}',
+  15, 'around', 'b0100000-0000-0000-0000-000000000002'::uuid
+),
+(
+  'Power Stop Colosseo',
+  'charge', 3.00,
+  'Via Celio Vibenna 1, Roma', 'Roma', 'Lazio',
+  41.8887, 12.4898, 0.0, 190,
+  'Ricarica smartphone e tablet vicino al Colosseo. USB-C PD 65W e USB-A 12W. Non restare a secco durante la visita ai Fori.',
+  '["https://picsum.photos/seed/rm-powerstop-colosseo/800/500"]',
+  '{"usb_a":true,"usb_c":true}',
+  15, 'recently', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'Charge Hub Termini',
+  'charge', 2.50,
+  'Via Giovanni Giolitti 6, Roma', 'Roma', 'Lazio',
+  41.9012, 12.5021, 0.0, 70,
+  'Stazione di ricarica in Stazione Termini. Funziona H24. USB-C, USB-A e presa standard. Ideale in attesa del treno.',
+  '["https://picsum.photos/seed/rm-charge-termini/800/500"]',
+  '{"usb_a":true,"usb_c":true,"schuko":true,"open_24h":true}',
+  15, 'around', 'b0100000-0000-0000-0000-000000000001'::uuid
+),
+(
+  'Powerbank Duomo',
+  'charge', 4.00,
+  'Piazza del Duomo 1, Milano', 'Milano', 'Lombardia',
+  45.4654, 9.1880, 4.7, 100,
+  'Ricarica premium a 20 metri dal Duomo. USB-C 100W, USB-A e Wireless Qi 15W. Per iPhone e Android, nessun cavo necessario.',
+  '["https://picsum.photos/seed/mi-powerbank-duomo/800/500"]',
+  '{"usb_a":true,"usb_c":true,"wireless_qi":true}',
+  15, 'recently', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Charge Centrale',
+  'charge', 3.00,
+  'Piazza Duca d''Aosta 2, Milano', 'Milano', 'Lombardia',
+  45.4852, 9.2018, 4.5, 65,
+  'Stazione di ricarica in Stazione Centrale. USB-C e USB-A ad alta potenza. Aperta H24, ideale tra i treni.',
+  '["https://picsum.photos/seed/mi-charge-centrale/800/500"]',
+  '{"usb_a":true,"usb_c":true,"open_24h":true}',
+  15, 'around', 'b0100000-0000-0000-0000-000000000005'::uuid
+),
+(
+  'Carica SMN',
+  'charge', 2.50,
+  'Piazza Santa Maria Novella 1, Firenze', 'Firenze', 'Toscana',
+  43.7745, 11.2491, 0.0, 100,
+  'Ricarica veloce alla stazione di Firenze. USB-C e USB-A, sempre disponibili. Perfetta prima di salire sul treno.',
+  '["https://picsum.photos/seed/fi-carica-smn/800/500"]',
+  '{"usb_a":true,"usb_c":true}',
+  15, 'recently', 'b0100000-0000-0000-0000-000000000003'::uuid
+),
+(
+  'Power Uffizi',
+  'charge', 3.00,
+  'Piazzale degli Uffizi 3, Firenze', 'Firenze', 'Toscana',
+  43.7680, 11.2553, 0.0, 140,
+  'Stazione di ricarica a due passi dagli Uffizi. USB-C PD e USB-A. Non perdere foto storiche per batteria scarica.',
+  '["https://picsum.photos/seed/fi-power-uffizi/800/500"]',
+  '{"usb_a":true,"usb_c":true}',
+  15, 'around', 'b0100000-0000-0000-0000-000000000003'::uuid
+),
+(
+  'Ricarica Garibaldi',
+  'charge', 2.00,
+  'Piazza Garibaldi 80, Napoli', 'Napoli', 'Campania',
+  40.8524, 14.2720, 0.0, 80,
+  'Stazione di ricarica nella stazione centrale di Napoli. USB-A e USB-C. Funziona H24, zero code.',
+  '["https://picsum.photos/seed/na-ricarica-garibaldi/800/500"]',
+  '{"usb_a":true,"usb_c":true,"open_24h":true}',
+  15, 'recently', 'b0100000-0000-0000-0000-000000000004'::uuid
+),
+(
+  'Charge Toledo',
+  'charge', 2.50,
+  'Via Toledo 88, Napoli', 'Napoli', 'Campania',
+  40.8413, 14.2511, 0.0, 230,
+  'Colonnina di ricarica su Via Toledo, la strada più vivace di Napoli. USB-C e USB-A. Ricarica mentre fai shopping.',
+  '["https://picsum.photos/seed/na-charge-toledo/800/500"]',
+  '{"usb_a":true,"usb_c":true}',
+  15, 'around', 'b0100000-0000-0000-0000-000000000004'::uuid
 );
 
 -- ============================================================
--- 4. SERVICE SLOTS  (next 14 days, 09:00–18:00, every 30 min)
+-- 4. SERVICE SLOTS  (next 90 days, 09:00–18:00, every 30 min)
 -- ============================================================
 INSERT INTO public.service_slots (service_id, slot_start, slot_end)
 SELECT
@@ -976,10 +1291,10 @@ SELECT
   date_trunc('day', now()) + (d.n * INTERVAL '1 day')
     + make_interval(hours => h.h, mins => m.m + 30)     AS slot_end
 FROM public.services s
-CROSS JOIN generate_series(0, 13)   AS d(n)
+CROSS JOIN generate_series(0, 89)   AS d(n)
 CROSS JOIN generate_series(9, 17)   AS h(h)
 CROSS JOIN (VALUES (0), (30))       AS m(m)
-WHERE s.description IS NOT NULL;
+WHERE s.host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL);
 
 -- ============================================================
 -- 5. MOCK REVIEWS  (2 per service)
@@ -1017,7 +1332,7 @@ SELECT
   END,
   now() - ((55 + ((ROW_NUMBER() OVER (ORDER BY s.created_at, s.id) - 1) % 40))::int || ' days')::interval
 FROM public.services s
-WHERE s.description IS NOT NULL;
+WHERE s.host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL);
 
 -- Second review for each service (different modulo offset)
 INSERT INTO public.service_reviews (
@@ -1050,7 +1365,7 @@ SELECT
   END,
   now() - ((10 + ((ROW_NUMBER() OVER (ORDER BY s.id DESC) - 1) % 45))::int || ' days')::interval
 FROM public.services s
-WHERE s.description IS NOT NULL;
+WHERE s.host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL);
 
 -- Calcola il rating come media diretta delle rating_10 (scala 0-10, coerente con la UI)
 UPDATE public.services s
@@ -1059,7 +1374,7 @@ SET rating = (
   FROM public.service_reviews sr
   WHERE sr.service_id = s.id
 )
-WHERE s.description IS NOT NULL;
+WHERE s.host_id IN (SELECT id FROM public.hosts WHERE guest_id IS NULL);
 
 COMMIT;
 

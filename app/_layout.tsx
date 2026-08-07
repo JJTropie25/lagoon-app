@@ -1,8 +1,10 @@
-import { useState } from "react";
+import * as Sentry from "@sentry/react-native";
+import { PostHogProvider } from "posthog-react-native";
+import React, { useState } from "react";
 import { Stack } from "expo-router";
 import { I18nProvider } from "../lib/i18n";
 import { useAuthState } from "../lib/auth";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppDialogProvider } from "../components/AppDialogProvider";
 import { useFonts } from "expo-font";
@@ -12,8 +14,34 @@ import SplashScreen from "../components/SplashScreen";
 import NotificationsProvider from "../components/NotificationsProvider";
 import StripeRootProvider from "../components/StripeRootProvider";
 import { ThemeProvider } from "../lib/theme-context";
+import { initialWindowMetrics } from "react-native-safe-area-context";
+import { posthog } from "../lib/analytics";
 
-export default function RootLayout() {
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? "",
+  enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: __DEV__ ? 0 : 0.2,
+  environment: __DEV__ ? "development" : "production",
+});
+
+// Read the real system nav bar height once at module init time (synchronous native call,
+// before any SafeAreaProvider mounts). This gives the adaptive value: ~48dp for 3-button
+// nav, ~24-34dp for gesture nav, 0 if no nav bar. We apply it as root paddingBottom
+// WITHOUT touching the SafeAreaProvider tree — so useSafeAreaInsets().bottom stays 0
+// in all child screens and SafeAreaView never double-compensates.
+const NAV_BAR_HEIGHT = Platform.OS === "android"
+  ? (initialWindowMetrics?.insets.bottom ?? 0)
+  : 0;
+
+function AndroidNavBarSpacer({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ flex: 1, paddingBottom: NAV_BAR_HEIGHT, backgroundColor: "#0B3F3F" }}>
+      {children}
+    </View>
+  );
+}
+
+function RootLayout() {
   useAuthState();
   const [fontsLoaded] = useFonts({
     ...MaterialCommunityIcons.font,
@@ -64,17 +92,25 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 
-  return (
-    <View style={{ flex: 1 }}>
-      <StripeRootProvider>{Content}</StripeRootProvider>
-      {/* Animated overlay — slides off to the right when done, revealing the
-          app underneath with no flash. Fonts are loaded so Baloo2 is available. */}
+  const inner = (
+    <>
+      <AndroidNavBarSpacer>
+        <StripeRootProvider>{Content}</StripeRootProvider>
+      </AndroidNavBarSpacer>
       {!splashDone && (
         <SplashScreen onDone={() => setSplashDone(true)} />
       )}
-    </View>
+    </>
   );
+
+  return posthog ? (
+    <PostHogProvider client={posthog} options={{ enableSessionReplay: true }}>
+      {inner}
+    </PostHogProvider>
+  ) : inner;
 }
+
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

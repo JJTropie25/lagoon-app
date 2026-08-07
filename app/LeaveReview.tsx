@@ -143,6 +143,11 @@ function makeStyles(c: ThemeColors) {
       justifyContent: "center",
       alignItems: "center",
       paddingHorizontal: 12,
+      shadowColor: c.warmAccentDark,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
     submitBtnDisabled: {
       opacity: 0.6,

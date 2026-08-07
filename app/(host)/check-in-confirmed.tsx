@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "../../lib/theme-context";
@@ -20,7 +20,14 @@ function makeStyles(c: ThemeColors) {
       fontSize: 24,
       fontWeight: "600",
       color: c.textPrimary,
-      marginBottom: 18,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    subtitle: {
+      fontSize: 14,
+      color: c.textSecondary,
+      marginBottom: 28,
+      textAlign: "center",
     },
     button: {
       backgroundColor: c.textPrimary,
@@ -40,16 +47,33 @@ export default function CheckInConfirmed() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+
+  const isCheckout = mode === "checkout";
 
   return (
     <SafeAreaView style={styles.screen}>
       <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
         <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name="check-circle" size={86} color="#2FA46D" />
+          <MaterialCommunityIcons
+            name={isCheckout ? "check-all" : "check-circle"}
+            size={86}
+            color="#2FA46D"
+          />
         </View>
-        <Text style={styles.title}>Check in confirmed</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.replace("/(host)/reservations")}>
-          <Text style={styles.buttonText}>Back to reservations</Text>
+        <Text style={styles.title}>
+          {isCheckout ? "Prenotazione completata" : "Check-in confermato"}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isCheckout
+            ? "Il servizio è stato erogato correttamente."
+            : "Il guest è stato registrato con successo."}
+        </Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.replace("/(host)/reservations")}
+        >
+          <Text style={styles.buttonText}>Torna alle prenotazioni</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

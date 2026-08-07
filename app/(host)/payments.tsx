@@ -15,6 +15,15 @@ import { createAccountLink, createConnectedAccount, getStripeReturnUrl } from ".
 
 WebBrowser.maybeCompleteAuthSession();
 
+type HistoryEntry = {
+  id: string;
+  serviceTitle: string;
+  slotStart: string;
+  peopleCount: number;
+  amount: number;
+  status: string;
+};
+
 const HEADER_COLOR = "#4F9B9B";
 const GREEN = "#2A7A3A";
 const GREEN_BG = "#EBF5EC";
@@ -79,6 +88,23 @@ function makeStyles(c: ThemeColors) {
     },
     detailLabel: { fontSize: 14, color: c.textSecondary, fontWeight: "500" },
     detailValue: { fontSize: 14, fontWeight: "700" },
+
+    historyRow: {
+      flexDirection: "row", alignItems: "center",
+      paddingVertical: 12, gap: 12,
+    },
+    historyIconWrap: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: c.surfaceSoft,
+      alignItems: "center", justifyContent: "center",
+    },
+    historyMeta: { flex: 1 },
+    historyTitle: { fontSize: 14, fontWeight: "600", color: c.textPrimary, marginBottom: 2 },
+    historyDate: { fontSize: 12, color: c.textMuted },
+    historyRight: { alignItems: "flex-end" },
+    historyAmount: { fontSize: 14, fontWeight: "700", color: c.textPrimary },
+    historyStatus: { fontSize: 11, marginTop: 2 },
+    emptyHistory: { fontSize: 14, color: c.textMuted, textAlign: "center", paddingVertical: 20 },
   });
 }
 
@@ -93,21 +119,53 @@ export default function HostPayments() {
   const [hostStatus, setHostStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
+  const [bookingHistory, setBookingHistory] = useState<HistoryEntry[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
       if (!supabase || !user) { setLoading(false); return () => { mounted = false; }; }
+
       supabase
         .from("hosts")
         .select("id, stripe_account_id, stripe_onboarding_complete, stripe_charges_enabled, stripe_payouts_enabled")
         .eq("guest_id", user.id)
         .maybeSingle()
-        .then(({ data }) => {
+        .then(async ({ data: host }) => {
           if (!mounted) return;
-          setHostStatus(data ?? null);
+          setHostStatus(host ?? null);
           setLoading(false);
+
+          if (!host) return;
+          const { data: services } = await supabase!
+            .from("services")
+            .select("id, title, price_eur")
+            .eq("host_id", host.id);
+          if (!mounted || !services || services.length === 0) return;
+
+          const serviceMap = new Map(services.map((s: any) => [s.id, s]));
+          const serviceIds = services.map((s: any) => s.id);
+          const { data: bkgs } = await supabase!
+            .from("bookings")
+            .select("id, service_id, slot_start, people_count, status, created_at")
+            .in("service_id", serviceIds)
+            .order("slot_start", { ascending: false });
+          if (!mounted) return;
+
+          const entries: HistoryEntry[] = (bkgs ?? []).map((b: any) => {
+            const svc = serviceMap.get(b.service_id);
+            return {
+              id: b.id,
+              serviceTitle: svc?.title ?? "Service",
+              slotStart: b.slot_start,
+              peopleCount: b.people_count ?? 1,
+              amount: (svc?.price_eur ?? 0) * (b.people_count ?? 1),
+              status: b.status,
+            };
+          });
+          setBookingHistory(entries);
         });
+
       return () => { mounted = false; };
     }, [user])
   );
@@ -254,6 +312,52 @@ export default function HostPayments() {
               {activating ? "Opening Stripe…" : hasAccount ? "Continue Setup" : "Activate payments"}
             </Text>
           </Pressable>
+        )}
+
+        {/* Payment history */}
+        {!loading && (
+          <>
+            <View style={{ marginTop: 8 }} />
+            <Text style={styles.sectionLabel}>Payment history</Text>
+            <View style={styles.divider} />
+            {bookingHistory.length === 0 ? (
+              <Text style={styles.emptyHistory}>No bookings yet</Text>
+            ) : (
+              bookingHistory.map((entry, idx) => {
+                const date = new Date(entry.slotStart);
+                const dateStr = date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+                const timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+                const isCancelled = entry.status === "cancelled_by_guest" || entry.status === "cancelled_by_host";
+                const statusColor = isCancelled ? colors.textMuted : entry.status === "confirmed" ? GREEN : colors.textSecondary;
+                return (
+                  <View key={entry.id}>
+                    <View style={styles.historyRow}>
+                      <View style={styles.historyIconWrap}>
+                        <MaterialCommunityIcons
+                          name={isCancelled ? "calendar-remove-outline" : "calendar-check-outline"}
+                          size={20}
+                          color={isCancelled ? colors.textMuted : HEADER_COLOR}
+                        />
+                      </View>
+                      <View style={styles.historyMeta}>
+                        <Text style={styles.historyTitle} numberOfLines={1}>{entry.serviceTitle}</Text>
+                        <Text style={styles.historyDate}>{dateStr} · {timeStr} · {entry.peopleCount} {entry.peopleCount === 1 ? "person" : "people"}</Text>
+                      </View>
+                      <View style={styles.historyRight}>
+                        <Text style={[styles.historyAmount, isCancelled && { color: colors.textMuted, textDecorationLine: "line-through" }]}>
+                          €{entry.amount.toFixed(2)}
+                        </Text>
+                        <Text style={[styles.historyStatus, { color: statusColor }]}>
+                          {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                    {idx < bookingHistory.length - 1 && <View style={[styles.divider, { marginBottom: 0 }]} />}
+                  </View>
+                );
+              })
+            )}
+          </>
         )}
       </ScrollView>
     </View>

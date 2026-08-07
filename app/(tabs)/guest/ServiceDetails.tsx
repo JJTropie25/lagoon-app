@@ -271,6 +271,14 @@ function makeStyles(c: ThemeColors) {
       flexWrap: "wrap",
       gap: 8,
     },
+    dayNoSlots: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontStyle: "italic",
+      textAlign: "center",
+      paddingVertical: 8,
+      width: "100%",
+    },
     timeChip: {
       paddingVertical: 9,
       borderRadius: 8,
@@ -331,6 +339,40 @@ function makeStyles(c: ThemeColors) {
       lineHeight: 18,
     },
 
+    legalNotice: {
+      flexDirection: "row",
+      gap: 10,
+      backgroundColor: "#EDF7FF",
+      borderRadius: 10,
+      padding: 12,
+      marginTop: 12,
+      alignItems: "flex-start",
+    },
+    legalNoticeDark: {
+      backgroundColor: "#0A2A3F",
+    },
+    legalNoticeText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 18,
+      color: "#1A4F8A",
+    },
+    legalNoticeTextDark: {
+      color: "#7EC8E3",
+    },
+    legalNoticeTavolo: {
+      backgroundColor: "#FFF0F5",
+    },
+    legalNoticeTavoloDark: {
+      backgroundColor: "#3A0A20",
+    },
+    legalNoticeTextTavolo: {
+      color: "#880E4F",
+    },
+    legalNoticeTextTavoloDark: {
+      color: "#F48FB1",
+    },
+
     pageDots: {
       position: "absolute",
       bottom: 10,
@@ -385,9 +427,16 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: c.warmAccent,
       borderRadius: 12,
       alignItems: "center",
+      shadowColor: c.warmAccent,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
     bookButtonDisabled: {
       backgroundColor: c.warmAccentSoft,
+      shadowOpacity: 0,
+      elevation: 0,
     },
     bookText: {
       color: "#fff",
@@ -404,7 +453,7 @@ export default function ServiceDetails() {
   const { t } = useI18n();
   const { user } = useAuthState();
   const dialog = useAppDialog();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { destination, timeslot, people, microservice, serviceId } =
@@ -455,18 +504,40 @@ export default function ServiceDetails() {
     (async () => {
       try {
         const nowIso = new Date().toISOString();
-        const { data } = await sb
-          .from("service_slots")
-          .select("id, slot_start, slot_end")
-          .eq("service_id", serviceId)
-          .gte("slot_start", nowIso)
-          .order("slot_start", { ascending: true });
+        const [{ data: slotData }, bookedSlotStarts] = await Promise.all([
+          sb
+            .from("service_slots")
+            .select("id, slot_start, slot_end")
+            .eq("service_id", serviceId)
+            .gte("slot_start", nowIso)
+            .order("slot_start", { ascending: true }),
+          // Try the public booked_slot_times view first; fall back to own bookings via RLS
+          (sb as any)
+            .from("booked_slot_times")
+            .select("slot_start")
+            .eq("service_id", serviceId)
+            .gte("slot_start", nowIso)
+            .then((r: any) => (r.data ?? []) as { slot_start: string }[])
+            .catch(() =>
+              sb
+                .from("bookings")
+                .select("slot_start")
+                .eq("service_id", serviceId)
+                .not("status", "in", '("cancelled_by_guest","cancelled_by_host")')
+                .gte("slot_start", nowIso)
+                .then((r: any) => r.data ?? [])
+                .catch(() => [] as { slot_start: string }[])
+            ),
+        ]);
         if (!isMounted) return;
-        const mapped = data?.map((row) => {
-          const start = new Date(row.slot_start);
-          const time = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
-          return { id: row.id, time, start: row.slot_start, end: row.slot_end };
-        }) ?? [];
+        const booked = new Set<string>((bookedSlotStarts as { slot_start: string }[]).map((b) => b.slot_start));
+        const mapped = (slotData ?? [])
+          .filter((row) => !booked.has(row.slot_start))
+          .map((row) => {
+            const start = new Date(row.slot_start);
+            const time = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+            return { id: row.id, time, start: row.slot_start, end: row.slot_end };
+          });
         setSlots(mapped);
         setLoadingSlots(false);
       } catch {
@@ -587,12 +658,6 @@ export default function ServiceDetails() {
   const chipWidth = Math.floor((panelWidth - PANEL_PADDING * 2 - 8 * 3) / 4);
 
   const groupedDays = useMemo(() => {
-    const DEFAULT_HOURS = Array.from({ length: 18 }, (_, i) => {
-      const h = 9 + Math.floor(i / 2);
-      const m = i % 2 === 0 ? "00" : "30";
-      return `${String(h).padStart(2, "0")}:${m}`;
-    });
-    // Build a map of DB hours per calendar day
     const slotsByDay = new Map<string, string[]>();
     for (const slot of slots) {
       const d = new Date(slot.start);
@@ -601,7 +666,6 @@ export default function ServiceDetails() {
       const list = slotsByDay.get(key)!;
       if (!list.includes(slot.time)) list.push(slot.time);
     }
-    // Always show 7 days starting from the requested date (or today)
     const base = requestedDate ? new Date(requestedDate.getTime()) : new Date();
     base.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
@@ -611,7 +675,7 @@ export default function ServiceDetails() {
       return {
         dateKey: key,
         dayLabel: d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
-        hours: slotsByDay.get(key) ?? DEFAULT_HOURS,
+        hours: slotsByDay.get(key) ?? [],
       };
     });
   }, [slots, requestedDate]);
@@ -674,7 +738,7 @@ export default function ServiceDetails() {
   };
 
   const handleBooking = async () => {
-    if (!user) { router.push("/(auth)/sign-in"); return; }
+    if (!user) { router.push("/(auth)/sign-in?continue=1"); return; }
     if (!serviceId || selectedSlots.size === 0) return;
     router.push({
       pathname: "/(tabs)/guest/Payment",
@@ -814,6 +878,22 @@ export default function ServiceDetails() {
                 </Text>
               </View>
             )}
+            {(normalizedCategory === "shower" || normalizedCategory === "rest") && (
+              <View style={[styles.legalNotice, mode === "dark" && styles.legalNoticeDark]}>
+                <MaterialCommunityIcons name="shield-check-outline" size={16} color={mode === "dark" ? "#7EC8E3" : "#1A4F8A"} style={{ marginTop: 1 }} />
+                <Text style={[styles.legalNoticeText, mode === "dark" && styles.legalNoticeTextDark]}>
+                  Servizio erogato da struttura ricettiva autorizzata. All'arrivo è obbligatorio esibire un documento d'identità valido per la registrazione di legge (TULPS).
+                </Text>
+              </View>
+            )}
+            {normalizedCategory === "tavolo" && (
+              <View style={[styles.legalNotice, styles.legalNoticeTavolo, mode === "dark" && styles.legalNoticeTavoloDark]}>
+                <MaterialCommunityIcons name="information-outline" size={16} color={mode === "dark" ? "#F48FB1" : "#880E4F"} style={{ marginTop: 1 }} />
+                <Text style={[styles.legalNoticeText, styles.legalNoticeTextTavolo, mode === "dark" && styles.legalNoticeTextTavoloDark]}>
+                  Spazio neutro destinato alla sosta e al consumo di pasti propri. La qualità e l'igiene del cibo portato da fuori sono sotto la responsabilità dell'utente.
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -886,7 +966,9 @@ export default function ServiceDetails() {
               <View key={dateKey} style={[styles.dayPanel, { width: panelWidth }]}>
                 <Text style={styles.dayPanelLabel}>{dayLabel}</Text>
                 <View style={styles.daySlots}>
-                  {hours.map((h) => {
+                  {hours.length === 0 ? (
+                    <Text style={styles.dayNoSlots}>{t("slot.noAvailable")}</Text>
+                  ) : hours.map((h) => {
                     const slotKey = `${dateKey}__${h}`;
                     const isSelected = selectedSlots.has(slotKey);
                     return (

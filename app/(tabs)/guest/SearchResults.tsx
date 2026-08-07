@@ -6,6 +6,7 @@ import {
   FlatList,
   Modal,
   Pressable,
+  BackHandler,
 } from "react-native";
 import LoadingCard from "../../../components/LoadingCard";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -17,6 +18,7 @@ import ResultsActionBar from "../../../components/ResultsActionBar";
 // @ts-ignore – Metro resolves platform extensions (.native.tsx/.web.tsx) at build time
 import ResultsMap from "../../../components/ResultsMap";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { analytics } from "../../../lib/analytics";
 import { useI18n } from "../../../lib/i18n";
 import { useTheme } from "../../../lib/theme-context";
 import { type ThemeColors } from "../../../lib/theme";
@@ -57,9 +59,9 @@ export default function SearchResults() {
     "priceUp" | "priceDown" | "topRated" | "nearest"
   >("topRated");
   const [priceMax, setPriceMax] = useState(500);
-  const [distanceMax, setDistanceMax] = useState(50);
+  const [distanceMax, setDistanceMax] = useState(10);
   const [ratingMin, setRatingMin] = useState(0);
-  const [filterDraft, setFilterDraft] = useState({ priceMax: 500, distanceMax: 50, ratingMin: 0 });
+  const [filterDraft, setFilterDraft] = useState({ priceMax: 500, distanceMax: 10, ratingMin: 0 });
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const mapScrollRef = useRef<FlatList<Service>>(null);
   const CARD_WIDTH = 260;
@@ -193,9 +195,6 @@ export default function SearchResults() {
       }
     }
     items = items.filter((s) => s.price_eur <= priceMax);
-    if (!destinationCoords || !hasCoords) {
-      items = items.filter((s) => distanceForService(s) <= distanceMax * 1000);
-    }
     items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
     if (sortBy === "priceUp") {
       items = [...items].sort((a, b) => a.price_eur - b.price_eur);
@@ -219,15 +218,6 @@ export default function SearchResults() {
     sortBy,
   ]);
 
-  const mapResults = useMemo(
-    () =>
-      filteredResults.filter(
-        (item) =>
-          typeof item.latitude === "number" &&
-          typeof item.longitude === "number"
-      ),
-    [filteredResults]
-  );
   const resultsByIndex = useMemo(() => filteredResults, [filteredResults]);
 
   const closestFallback = useMemo(() => {
@@ -236,21 +226,64 @@ export default function SearchResults() {
       ? services.filter((s) => s.category === normalizedCategory)
       : services;
     if (!destinationCoords) return pool.slice(0, 5);
-    return [...pool]
+    const withCoords = [...pool]
       .filter((s) => typeof s.latitude === "number" && typeof s.longitude === "number")
       .sort(
         (a, b) =>
           haversineMeters(destinationCoords.latitude, destinationCoords.longitude, a.latitude as number, a.longitude as number) -
           haversineMeters(destinationCoords.latitude, destinationCoords.longitude, b.latitude as number, b.longitude as number)
-      )
-      .slice(0, 5);
+      );
+    const withoutCoords = pool.filter(
+      (s) => typeof s.latitude !== "number" || typeof s.longitude !== "number"
+    );
+    return [...withCoords, ...withoutCoords].slice(0, 5);
   }, [filteredResults.length, services, normalizedCategory, destinationCoords]);
 
+  const sortedClosestFallback = useMemo(() => {
+    if (closestFallback.length === 0) return [];
+    let items = closestFallback.filter(
+      (s) => s.price_eur <= priceMax && (s.rating ?? 0) >= ratingMin
+    );
+    if (sortBy === "priceUp") items = [...items].sort((a, b) => a.price_eur - b.price_eur);
+    else if (sortBy === "priceDown") items = [...items].sort((a, b) => b.price_eur - a.price_eur);
+    else if (sortBy === "topRated") items = [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    else if (sortBy === "nearest") items = [...items].sort((a, b) => distanceForService(a) - distanceForService(b));
+    return items;
+  }, [closestFallback, priceMax, ratingMin, sortBy, distanceForService]);
+
+  const activeResultsByIndex = useMemo(
+    () => (resultsByIndex.length > 0 ? resultsByIndex : sortedClosestFallback),
+    [resultsByIndex, sortedClosestFallback]
+  );
+
+  const activeMapResults = useMemo(
+    () =>
+      activeResultsByIndex.filter(
+        (s) => typeof s.latitude === "number" && typeof s.longitude === "number"
+      ),
+    [activeResultsByIndex]
+  );
+
   useEffect(() => {
-    if (viewMode === "map" && !selectedTitle && resultsByIndex.length > 0) {
-      setSelectedTitle(resultsByIndex[0].title);
+    if (viewMode === "map" && !selectedTitle && activeResultsByIndex.length > 0) {
+      setSelectedTitle(activeResultsByIndex[0].title);
     }
-  }, [resultsByIndex, selectedTitle, viewMode]);
+  }, [activeResultsByIndex, selectedTitle, viewMode]);
+
+  const searchTrackedRef = useRef(false);
+  useEffect(() => {
+    if (loadingServices || searchTrackedRef.current) return;
+    searchTrackedRef.current = true;
+    analytics.searchPerformed({
+      microservice: normalizedCategory,
+      destination: destination ?? null,
+      result_count: filteredResults.length,
+    });
+    if (filteredResults.length === 0) {
+      analytics.emptySearch({ microservice: normalizedCategory, destination: destination ?? null });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingServices]);
 
   const { summaryDate } = useMemo(() => {
     const raw = String(timeslot ?? "").trim();
@@ -286,7 +319,7 @@ export default function SearchResults() {
   }, [language, timeslot]);
 
   const isFilterActive =
-    priceMax !== 500 || distanceMax !== 50 || ratingMin !== 0;
+    priceMax !== 500 || distanceMax !== 10 || ratingMin !== 0;
 
   const SummaryBar = ({ onBack }: { onBack: () => void }) => (
     <View style={styles.summaryRow}>
@@ -335,6 +368,15 @@ export default function SearchResults() {
 
   const goBack = () =>
     router.canGoBack() ? router.back() : router.replace("/(tabs)/guest");
+
+  useEffect(() => {
+    if (viewMode !== "map") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setViewMode("list");
+      return true;
+    });
+    return () => sub.remove();
+  }, [viewMode]);
 
   return (
     <>
@@ -391,10 +433,10 @@ export default function SearchResults() {
                   ) : (
                   <Text style={styles.emptyTitle}>{t("search.noResultsTitle")}</Text>
                   )}
-                  {!loadingServices && closestFallback.length > 0 && (
+                  {!loadingServices && sortedClosestFallback.length > 0 && (
                     <>
                       <Text style={styles.closestTitle}>{t("search.closestTitle")}</Text>
-                      {closestFallback.map((item, idx) => (
+                      {sortedClosestFallback.map((item, idx) => (
                         <View key={item.id}>
                           {idx > 0 && <View style={styles.divider} />}
                           <ServiceCard
@@ -509,16 +551,16 @@ export default function SearchResults() {
           </View>
         ) : (
           <View style={styles.mapContainer}>
-            {mapResults.length === 0 ? (
+            {activeMapResults.length === 0 ? (
               <View style={styles.emptyMap}>
                 <Text style={styles.emptyText}>{t("search.noResults")}</Text>
               </View>
             ) : (
               <ResultsMap
-                results={mapResults}
+                results={activeMapResults}
                 selectedTitle={selectedTitle}
                 onSelect={(title: string) => {
-                  const index = resultsByIndex.findIndex((r) => r.title === title);
+                  const index = activeResultsByIndex.findIndex((r) => r.title === title);
                   if (index >= 0) {
                     mapScrollRef.current?.scrollToOffset({
                       offset: index * CARD_SNAP,
@@ -532,7 +574,7 @@ export default function SearchResults() {
 
             <View style={styles.mapTop}>
               <View style={[styles.mapSummaryHeader, { paddingTop: insets.top + 10, backgroundColor: accentColor }]}>
-                <SummaryBar onBack={goBack} />
+                <SummaryBar onBack={() => setViewMode("list")} />
               </View>
               <View style={styles.mapActionBarRow}>
                 <ResultsActionBar
@@ -565,7 +607,7 @@ export default function SearchResults() {
             <View style={styles.mapBottom}>
               <FlatList
                 ref={mapScrollRef}
-                data={filteredResults}
+                data={activeResultsByIndex}
                 keyExtractor={(item) => item.id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -579,7 +621,7 @@ export default function SearchResults() {
                 onMomentumScrollEnd={(e) => {
                   const x = e.nativeEvent.contentOffset.x;
                   const index = Math.round(x / CARD_SNAP);
-                  const item = resultsByIndex[index];
+                  const item = activeResultsByIndex[index];
                   if (item) setSelectedTitle(item.title);
                 }}
                 renderItem={({ item }) => (
@@ -754,7 +796,7 @@ export default function SearchResults() {
               <TouchableOpacity
                 style={styles.clearBtn}
                 onPress={() => {
-                  setFilterDraft({ priceMax: 500, distanceMax: 50, ratingMin: 0 });
+                  setFilterDraft({ priceMax: 500, distanceMax: 10, ratingMin: 0 });
                 }}
               >
                 <Text style={styles.clearBtnText}>Clear</Text>

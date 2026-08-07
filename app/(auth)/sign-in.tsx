@@ -7,7 +7,9 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { markLoginPrompted } from "../../lib/loginPrompt";
 import { supabase } from "../../lib/supabase";
 import { useI18n } from "../../lib/i18n";
 import { useTheme } from "../../lib/theme-context";
@@ -55,6 +57,12 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: "rgba(255,255,255,0.10)",
       transform: [{ rotate: "-14deg" }],
     },
+    closeBtn: {
+      position: "absolute",
+      right: 20,
+      zIndex: 10,
+      padding: 8,
+    },
     title: { fontSize: 24, fontWeight: "700", fontFamily: "Baloo2_700Bold", color: "#E2F2F2" },
     subtitle: { marginTop: 8, fontSize: 16, fontWeight: "600", color: "#E2F2F2" },
     socialRow: { marginTop: 20, gap: 10 },
@@ -89,6 +97,11 @@ function makeStyles(c: ThemeColors) {
       borderRadius: 10,
       alignItems: "center",
       marginTop: 8,
+      shadowColor: c.warmAccent,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
     primaryButtonText: { color: c.background, fontSize: 16, fontWeight: "600" },
     disabled: { opacity: 0.7 },
@@ -101,6 +114,9 @@ function makeStyles(c: ThemeColors) {
 
 export default function SignIn() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { continue: continueParam } = useLocalSearchParams<{ continue?: string }>();
+  const isContinue = continueParam === "1";
   const { t } = useI18n();
   const dialog = useAppDialog();
   const { colors } = useTheme();
@@ -113,16 +129,28 @@ export default function SignIn() {
   const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "apple" | null>(null);
   const showApple = Platform.OS === "ios";
 
+  const dismiss = async () => {
+    await markLoginPrompted();
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/guest");
+  };
+
+  const goAfterLogin = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/guest");
+  };
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/(tabs)/guest");
+      if (data.session) goAfterLogin();
     });
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) router.replace("/(tabs)/guest");
+      if (session) goAfterLogin();
     });
     return () => { authListener?.subscription?.unsubscribe(); };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSignIn = async () => {
     if (!supabase) {
@@ -133,7 +161,7 @@ export default function SignIn() {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (error) { await dialog.alert(t("auth.signInTitle"), error.message); return; }
-    router.replace("/(tabs)/guest");
+    goAfterLogin();
   };
 
   const handleForgotPassword = async () => {
@@ -189,7 +217,7 @@ export default function SignIn() {
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) { await dialog.alert(t("auth.signInTitle"), exchangeError.message); return; }
-        router.replace("/(tabs)/guest");
+        goAfterLogin();
         return;
       }
       const hash = result.url.split("#")[1] ?? "";
@@ -199,7 +227,7 @@ export default function SignIn() {
       if (accessToken && refreshToken) {
         const { error: setError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         if (setError) { await dialog.alert(t("auth.signInTitle"), setError.message); return; }
-        router.replace("/(tabs)/guest");
+        goAfterLogin();
       }
     } finally {
       setOauthLoading(null);
@@ -210,8 +238,18 @@ export default function SignIn() {
     <View style={styles.container}>
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
-      <Text style={styles.title}>{t("auth.signInTitle")}</Text>
-      <Text style={styles.subtitle}>{t("auth.signInSubtitle")}</Text>
+
+      {/* Dismiss button — visible whenever the screen can be closed */}
+      <Pressable style={[styles.closeBtn, { top: insets.top + 12 }]} onPress={dismiss}>
+        <MaterialCommunityIcons name="close" size={22} color="rgba(226,242,242,0.75)" />
+      </Pressable>
+
+      <Text style={styles.title}>
+        {isContinue ? "Accedi per continuare" : t("auth.signInTitle")}
+      </Text>
+      <Text style={styles.subtitle}>
+        {isContinue ? "Devi essere connesso per usare questa funzione." : t("auth.signInSubtitle")}
+      </Text>
 
       <View style={styles.socialRow}>
         {showApple ? (

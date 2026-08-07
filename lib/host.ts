@@ -2,15 +2,73 @@ import { supabase } from "./supabase";
 import type { Service, ServiceAmenities } from "./services";
 import { parseFirstImageUrl } from "./services";
 
+export type HostTier = "COMMERCIAL_STORE" | "FOOD_AND_COWORKING" | "CERTIFIED_ACCOMMODATION" | "SPORT_CENTER";
+export type VerificationStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+
+export const TIER_ALLOWED_CATEGORIES: Record<HostTier, Service["category"][]> = {
+  COMMERCIAL_STORE:        ["storage", "charge"],
+  FOOD_AND_COWORKING:      ["storage", "charge", "focus", "tavolo"],
+  CERTIFIED_ACCOMMODATION: ["storage", "charge", "focus", "tavolo", "shower", "rest"],
+  SPORT_CENTER:            ["shower", "storage", "charge"],
+};
+
+const SLOT_DAYS_AHEAD = 60;
+
+function buildSlotRows(serviceId: string, times: string[]): { service_id: string; slot_start: string; slot_end: string }[] {
+  const now = new Date();
+  const rows: { service_id: string; slot_start: string; slot_end: string }[] = [];
+  for (let day = 0; day < SLOT_DAYS_AHEAD; day++) {
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day);
+    for (const time of times) {
+      const [h, m] = time.split(":").map(Number);
+      const start = new Date(base);
+      start.setHours(h, m, 0, 0);
+      if (start <= now) continue;
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+      rows.push({ service_id: serviceId, slot_start: start.toISOString(), slot_end: end.toISOString() });
+    }
+  }
+  return rows;
+}
+
 export type HostAccount = {
   id: string;
   guest_id: string | null;
   display_name: string | null;
+  business_name: string | null;
+  tax_id: string | null;
+  business_address: string | null;
+  business_phone: string | null;
+  host_tier: HostTier | null;
+  verification_status: VerificationStatus;
+  cin_cir_number: string | null;
+  document_url: string | null;
+  self_cert_accepted: boolean;
+  enabled_categories: Service["category"][];
+  onboarding_complete: boolean;
   stripe_account_id?: string | null;
   stripe_onboarding_complete?: boolean;
   stripe_charges_enabled?: boolean;
   stripe_payouts_enabled?: boolean;
 };
+
+export type HostOnboardingInput = {
+  hostId: string;
+  businessName: string;
+  taxId: string;
+  businessAddress: string;
+  businessPhone: string;
+  hostTier: HostTier;
+  documentUrl: string | null;
+  cinCirNumber: string | null;
+  selfCertAccepted: boolean;
+  enabledCategories: Service["category"][];
+};
+
+const HOST_FIELDS =
+  "id, guest_id, display_name, business_name, tax_id, business_address, business_phone, " +
+  "host_tier, verification_status, cin_cir_number, document_url, self_cert_accepted, " +
+  "enabled_categories, onboarding_complete";
 
 export type HostReservation = {
   id: string;
@@ -36,10 +94,10 @@ export async function resolveHostForUser(
   if (!userId) return { host: null, preview: false };
   const { data: owned } = await supabase
     .from("hosts")
-    .select("id, guest_id, display_name")
+    .select(HOST_FIELDS)
     .eq("guest_id", userId)
     .maybeSingle();
-  return { host: (owned as HostAccount | null) ?? null, preview: false };
+  return { host: (owned as unknown as HostAccount | null) ?? null, preview: false };
 }
 
 export async function ensureHostForUser(
@@ -51,10 +109,10 @@ export async function ensureHostForUser(
 
   const { data: existing } = await supabase
     .from("hosts")
-    .select("id, guest_id, display_name")
+    .select(HOST_FIELDS)
     .eq("guest_id", userId)
     .maybeSingle();
-  if (existing) return { host: existing as HostAccount, error: null };
+  if (existing) return { host: existing as unknown as HostAccount, error: null };
 
   const { data, error } = await supabase
     .from("hosts")
@@ -62,11 +120,11 @@ export async function ensureHostForUser(
       guest_id: userId,
       display_name: displayName ?? null,
     })
-    .select("id, guest_id, display_name")
+    .select(HOST_FIELDS)
     .single();
 
   if (error) return { host: null, error: error.message };
-  return { host: (data as HostAccount) ?? null, error: null };
+  return { host: (data as unknown as HostAccount) ?? null, error: null };
 }
 
 export async function fetchHostListings(hostId: string): Promise<Service[]> {
@@ -189,35 +247,26 @@ export async function updateHostListing(input: UpdateListingInput): Promise<stri
 
   const nextTimes = normalizeSlotTimes(slotTimes);
   const currentTimes = normalizeSlotTimes(await fetchServiceSlots(serviceId));
-  const slotsChanged =
+  const timesChanged =
     nextTimes.length !== currentTimes.length ||
     nextTimes.some((time, index) => time !== currentTimes[index]);
 
-  if (!slotsChanged) return null;
-
-  const { error: deleteSlotsError } = await supabase
-    .from("service_slots")
-    .delete()
-    .eq("service_id", serviceId);
-  if (deleteSlotsError) return deleteSlotsError.message;
-
-  if (nextTimes.length > 0) {
-    const now = new Date();
-    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const rows = nextTimes.map((time) => {
-      const [h, m] = time.split(":").map((v) => Number(v));
-      const start = new Date(base);
-      start.setHours(h, m, 0, 0);
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-      return {
-        service_id: serviceId,
-        slot_start: start.toISOString(),
-        slot_end: end.toISOString(),
-      };
-    });
-    const { error: insertSlotsError } = await supabase.from("service_slots").insert(rows);
-    if (insertSlotsError) return insertSlotsError.message;
+  if (!timesChanged) {
+    const { data: futureCheck } = await supabase
+      .from("service_slots")
+      .select("id")
+      .eq("service_id", serviceId)
+      .gt("slot_start", new Date().toISOString())
+      .limit(1);
+    if ((futureCheck?.length ?? 0) > 0) return null;
   }
+
+  const rows = buildSlotRows(serviceId, nextTimes);
+  const { error: rpcError } = await (supabase as any).rpc("replace_service_slots", {
+    p_service_id: serviceId,
+    p_rows: rows.map((r) => ({ slot_start: r.slot_start, slot_end: r.slot_end })),
+  });
+  if (rpcError) return rpcError.message;
 
   return null;
 }
@@ -268,25 +317,38 @@ export async function createHostListing(
   const nextTimes = normalizeSlotTimes(slotTimes);
   if (nextTimes.length === 0) return { error: null, serviceId };
 
-  const now = new Date();
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const rows = nextTimes.map((time) => {
-    const [h, m] = time.split(":").map((v) => Number(v));
-    const start = new Date(base);
-    start.setHours(h, m, 0, 0);
-    const end = new Date(start.getTime() + 30 * 60 * 1000);
-    return {
-      service_id: serviceId,
-      slot_start: start.toISOString(),
-      slot_end: end.toISOString(),
-    };
+  const rows = buildSlotRows(serviceId, nextTimes);
+  const { error: rpcError } = await (supabase as any).rpc("replace_service_slots", {
+    p_service_id: serviceId,
+    p_rows: rows.map((r) => ({ slot_start: r.slot_start, slot_end: r.slot_end })),
   });
-
-  const { error: insertSlotsError } = await supabase.from("service_slots").insert(rows);
-  if (!insertSlotsError) return { error: null, serviceId };
+  if (!rpcError) return { error: null, serviceId };
 
   await supabase.from("services").delete().eq("id", serviceId);
-  return { error: insertSlotsError.message, serviceId: null };
+  return { error: rpcError.message, serviceId: null };
+}
+
+export async function submitHostOnboarding(
+  input: HostOnboardingInput
+): Promise<string | null> {
+  if (!supabase) return "Supabase not configured.";
+  const { error } = await supabase
+    .from("hosts")
+    .update({
+      business_name:       input.businessName,
+      tax_id:              input.taxId,
+      business_address:    input.businessAddress,
+      business_phone:      input.businessPhone,
+      host_tier:           input.hostTier,
+      document_url:        input.documentUrl ?? null,
+      cin_cir_number:      input.cinCirNumber ?? null,
+      self_cert_accepted:  input.selfCertAccepted,
+      enabled_categories:  input.enabledCategories,
+      onboarding_complete: true,
+      verification_status: "PENDING_VERIFICATION",
+    })
+    .eq("id", input.hostId);
+  return error?.message ?? null;
 }
 
 export async function fetchHostReservations(

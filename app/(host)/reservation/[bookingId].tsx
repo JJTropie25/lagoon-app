@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,10 @@ import {
   Image,
   ScrollView,
   Linking,
+  BackHandler,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import LoadingCard from "../../../components/LoadingCard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -158,6 +161,11 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: HEADER_COLOR,
       paddingVertical: 15,
       borderRadius: 12,
+      shadowColor: HEADER_COLOR,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
     btnPrimaryText: {
       color: "#fff",
@@ -173,7 +181,29 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: c.warmAccent,
       paddingVertical: 15,
       borderRadius: 12,
+      shadowColor: c.warmAccent,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.30,
+      shadowRadius: 8,
+      elevation: 4,
     },
+    btnCancel: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: "transparent",
+      borderWidth: 1.5,
+      borderColor: "#B00020",
+      paddingVertical: 13,
+      borderRadius: 12,
+    },
+    btnCancelText: {
+      color: "#B00020",
+      fontWeight: "700",
+      fontSize: 15,
+    },
+    btnDisabled: { opacity: 0.55 },
     btnSecondaryText: {
       color: "#fff",
       fontWeight: "700",
@@ -205,25 +235,45 @@ export default function HostReservationDetail() {
   const [guestPhone, setGuestPhone] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [checkedInAt, setCheckedInAt] = useState<string | null>(null);
+  const [bookingStatus, setBookingStatus] = useState<string>("confirmed");
+  const [cancelling, setCancelling] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const goBack = useCallback(() => {
+    router.replace("/(host)/reservations");
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+        goBack();
+        return true;
+      });
+      return () => handler.remove();
+    }, [goBack])
+  );
 
   useEffect(() => {
+    setLoading(true);
     let mounted = true;
-    if (!supabase || !bookingId) return;
+    if (!supabase || !bookingId) { setLoading(false); return; }
     (async () => {
       const sb = supabase;
-      if (!sb) return;
+      if (!sb) { setLoading(false); return; }
       const { data: booking } = await sb
         .from("bookings")
-        .select("guest_id, people_count, slot_start, slot_end, qr_token, checked_in_at, service:services(title, location, image_url, category)")
+        .select("guest_id, people_count, slot_start, slot_end, qr_token, checked_in_at, status, service:services(title, location, image_url, category)")
         .eq("id", bookingId)
         .maybeSingle();
-      if (!mounted || !booking) return;
+      if (!mounted || !booking) { setLoading(false); return; }
 
       setPeople(booking.people_count ?? 1);
       setSlotStart(booking.slot_start ?? null);
       setSlotEnd(booking.slot_end ?? null);
       setQrToken(booking.qr_token ?? null);
       setCheckedInAt(booking.checked_in_at ?? null);
+      setBookingStatus((booking as any).status ?? "confirmed");
 
       const svc = Array.isArray(booking.service) ? booking.service[0] : booking.service;
       setServiceTitle(svc?.title ?? "-");
@@ -243,21 +293,48 @@ export default function HostReservationDetail() {
           setGuestPhone(`${profile.phone_country_code ?? ""}${profile.phone_number}`.replace(/[^\d+]/g, ""));
         }
       }
+      if (mounted) setLoading(false);
     })();
     return () => { mounted = false; };
   }, [bookingId]);
 
   const isExpired = slotEnd ? new Date(slotEnd).getTime() < Date.now() : false;
-  const isCheckedIn = Boolean(checkedInAt);
+  const isCheckedIn = bookingStatus === "checked_in";
+  const isCompleted = bookingStatus === "completed";
+  const isCancelledByHost = bookingStatus === "cancelled_by_host";
+  const isCancelledByGuest = bookingStatus === "cancelled_by_guest";
+  const isCancelled = isCancelledByHost || isCancelledByGuest;
 
-  const statusLabel = isExpired
+  const statusLabel = isCancelledByHost
+    ? "Annullata da host"
+    : isCancelledByGuest
+    ? "Annullata dal guest"
+    : isCompleted
+    ? "Completata"
+    : isExpired
     ? t("booking.expired")
     : isCheckedIn
     ? t("host.reservation.checkedIn")
     : t("host.reservation.reserved");
 
-  const statusBg = isExpired ? "#D5E0E0" : isCheckedIn ? "#BFE9D2" : "#F5E7A6";
-  const statusColor = isExpired ? "#687878" : isCheckedIn ? "#1F6E44" : "#7A6010";
+  const statusBg = isCancelled
+    ? "#FFD6D6"
+    : isCompleted
+    ? "#D5E0E0"
+    : isExpired
+    ? "#D5E0E0"
+    : isCheckedIn
+    ? "#BFE9D2"
+    : "#F5E7A6";
+  const statusColor = isCancelled
+    ? "#B00020"
+    : isCompleted
+    ? "#687878"
+    : isExpired
+    ? "#687878"
+    : isCheckedIn
+    ? "#1F6E44"
+    : "#7A6010";
 
   const catColor = serviceCategory ? (CATEGORY_COLORS[serviceCategory] ?? HEADER_COLOR) : HEADER_COLOR;
   const catIcon = serviceCategory ? toCategoryIcon(serviceCategory as any) : null;
@@ -275,14 +352,25 @@ export default function HostReservationDetail() {
 
   const headerH = insets.top + 52;
 
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity style={styles.headerBtn} onPress={goBack}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Reservation</Text>
+        </View>
+        <LoadingCard topSpacing={headerH + 48} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       {/* Fixed teal header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => (router.canGoBack() ? router.back() : router.replace("/(host)/reservations"))}
-        >
+        <TouchableOpacity style={styles.headerBtn} onPress={goBack}>
           <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Reservation</Text>
@@ -369,6 +457,7 @@ export default function HostReservationDetail() {
 
         {/* Action buttons */}
         <View style={styles.actions}>
+          {/* Contact guest */}
           <TouchableOpacity
             style={[styles.btnPrimary, !guestPhone && styles.btnDisabled]}
             disabled={!guestPhone}
@@ -387,18 +476,92 @@ export default function HostReservationDetail() {
             <Text style={styles.btnPrimaryText}>Contact guest</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() =>
-              router.push({
-                pathname: "/(host)/scan-qr",
-                params: { bookingId, expectedToken: qrToken ?? "" },
-              })
-            }
-          >
-            <MaterialCommunityIcons name="qrcode-scan" size={18} color="#fff" />
-            <Text style={styles.btnSecondaryText}>Scan QR</Text>
-          </TouchableOpacity>
+          {/* Scan QR — only when still confirmed */}
+          {!isCheckedIn && !isCompleted && !isCancelled && (
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              onPress={() =>
+                router.push({
+                  pathname: "/(host)/scan-qr",
+                  params: { bookingId, expectedToken: qrToken ?? "" },
+                })
+              }
+            >
+              <MaterialCommunityIcons name="qrcode-scan" size={18} color="#fff" />
+              <Text style={styles.btnSecondaryText}>Scan QR</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Mark complete — only when checked in */}
+          {isCheckedIn && !isCompleted && (
+            <TouchableOpacity
+              style={[styles.btnSecondary, completing && styles.btnDisabled]}
+              disabled={completing}
+              onPress={async () => {
+                const ok = await dialog.confirm({
+                  title: "Completa prenotazione",
+                  message: "Segna il servizio come completato e aggiorna lo stato della prenotazione.",
+                  confirmText: "Completa",
+                  cancelText: "Annulla",
+                });
+                if (!ok || !supabase || !bookingId) return;
+                setCompleting(true);
+                await supabase
+                  .from("bookings")
+                  .update({ status: "completed", checked_out_at: new Date().toISOString() })
+                  .eq("id", bookingId);
+                setBookingStatus("completed");
+                setCompleting(false);
+                router.replace({
+                  pathname: "/(host)/check-in-confirmed",
+                  params: { bookingId, mode: "checkout" },
+                });
+              }}
+            >
+              <MaterialCommunityIcons name="check-all" size={18} color="#fff" />
+              <Text style={styles.btnSecondaryText}>
+                {completing ? "..." : "Segna come completata"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Host cancel — only when confirmed or checked_in */}
+          {!isCompleted && !isCancelled && (
+            <TouchableOpacity
+              style={[styles.btnCancel, cancelling && styles.btnDisabled]}
+              disabled={cancelling}
+              onPress={async () => {
+                const ok = await dialog.confirm({
+                  title: "Annulla prenotazione",
+                  message: "Il guest riceverà un rimborso completo. Questa azione non può essere annullata.",
+                  confirmText: "Annulla prenotazione",
+                  cancelText: "Indietro",
+                  confirmVariant: "danger",
+                });
+                if (!ok || !supabase || !bookingId) return;
+                setCancelling(true);
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  await supabase.functions.invoke("refund-booking", {
+                    body: { booking_id: bookingId, status: "cancelled_by_host", reason: "Host cancellation" },
+                    headers: session?.access_token
+                      ? { Authorization: `Bearer ${session.access_token}` }
+                      : {},
+                  });
+                  setBookingStatus("cancelled_by_host");
+                } catch (e: any) {
+                  await dialog.alert("Errore", e?.message ?? String(e));
+                } finally {
+                  setCancelling(false);
+                }
+              }}
+            >
+              <MaterialCommunityIcons name="cancel" size={18} color="#B00020" />
+              <Text style={styles.btnCancelText}>
+                {cancelling ? "Annullamento..." : "Annulla prenotazione"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>

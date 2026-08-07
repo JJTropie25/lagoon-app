@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, FlatList } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import LoadingCard from "../../components/LoadingCard";
 import { useRouter } from "expo-router";
+import LoginGate from "../../components/LoginGate";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ServiceCard from "../../components/ServiceCard";
 import TabTopNotch from "../../components/TabTopNotch";
@@ -111,7 +112,7 @@ export default function Favorites() {
         pointerEvents="none"
       />
       <TabTopNotch />
-      <FlatList
+      {!user ? <LoginGate /> : <FlatList
           data={items}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
@@ -171,7 +172,7 @@ export default function Favorites() {
               }
             />
           )}
-        />
+        />}
     </View>
   );
 }
