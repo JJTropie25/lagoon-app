@@ -8,7 +8,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "env:demo": "node -e \"require('fs').copyFileSync('.env.demo', '.env')\" && echo Switched to DEMO",
+    "env:production": "node -e \"require('fs').copyFileSync('.env.production', '.env')\" && echo Switched to PRODUCTION"
   },
   "dependencies": {
     "@expo-google-fonts/baloo-2": "^0.4.2",

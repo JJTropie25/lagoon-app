@@ -1,121 +1,145 @@
 # Lagoon App
 
-Expo + Supabase app with guest/host flows, maps, notifications, and Stripe Connect payments.
+Expo + Supabase app with guest/host flows, maps, notifications, Stripe Connect payments, PostHog analytics, and Sentry error tracking.
+
+Part of the **Jungle** ecosystem:
+- `lagoon-app` — this repo (React Native / Expo)
+- `lagoon-web` — landing page (static HTML on Cloudflare Pages)
+
+---
 
 ## Prerequisites
 
 - Node.js 20+
 - npm
 - Expo CLI (`npx expo`)
+- EAS CLI (`npm install -g eas-cli`)
 - Supabase project
 - Stripe account (test mode for setup)
+
+---
 
 ## Local setup
 
 1. Install deps:
-
 ```bash
 npm install
 ```
 
-2. Create `.env` from `.env.example` and fill values:
+2. Copy the right env file for the environment you want to develop against:
+```bash
+npm run env:demo        # demo DB (mock data) — default for development
+npm run env:production  # production DB (empty, real users)
+```
 
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- Maps keys (`EXPO_PUBLIC_GOOGLE_*`) if you use maps/search
+Or manually copy `.env.demo` / `.env.production` to `.env`. Required variables:
+```env
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+EXPO_PUBLIC_POSTHOG_KEY=
+EXPO_PUBLIC_SENTRY_DSN=
+```
 
-3. (Android push) put `google-services.json` in project root.
+> Geocoding and place search use Photon (komoot) + Nominatim (OSM) — no extra API key needed.
 
-4. Start app:
+3. (Android push notifications) put `google-services.json` in project root.
 
+4. Start dev client:
 ```bash
 npx expo start
 ```
 
-## Stripe integration status
+---
 
-Implemented in repo:
+## Environments
 
-- Guest payment sheet (native): `app/(tabs)/guest/Payment.tsx`
-- Web fallback (card disabled): `lib/useStripeClient.web.ts`
-- Host onboarding UI: `app/(host)/profile.tsx`
-- Supabase Edge Functions:
-  - `stripe-create-connected-account`
-  - `stripe-create-account-link`
-  - `stripe-create-payment-intent`
-  - `stripe-webhook`
-  - `stripe-return`
-- DB migration: `supabase/migrations/20260403090000_stripe_connect.sql`
+The app supports two environments built with EAS, each with its own Supabase project and bundle ID:
 
-## What must be configured outside the app
+| Profile | Bundle ID | Supabase | Purpose |
+|---|---|---|---|
+| `production` | `com.lagoon.app` | Real DB (empty) | APK linked from landing page |
+| `demo` | `com.lagoon.demo` | Demo DB (curated mock data) | Screenshots and demos |
 
-### 1) Supabase secrets for Edge Functions
+Build commands:
+```bash
+eas build --profile production --platform android   # real app APK
+eas build --profile demo --platform android          # demo APK
+```
 
-Set these in Supabase project secrets:
+OTA updates:
+```bash
+eas update --branch production --message "..."
+eas update --branch demo --message "..."
+```
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- Optional: `STRIPE_WEBHOOK_SECRET_CONNECT`
-- Optional: `PLATFORM_FEE_PERCENT` (default 20)
+---
 
-### 2) Deploy functions
+## Database (Supabase)
 
-Deploy all Stripe functions to Supabase.
+### Apply migrations to a new project
+```bash
+npx supabase link --project-ref <PROJECT_REF>
+npx supabase db push --linked
+```
 
-### 3) Stripe webhooks
+### Seed demo data
+Run `supabase/seeds/mock_curated.sql` in the Supabase Dashboard SQL editor of the demo project.
 
-Create webhook endpoint for your deployed `stripe-webhook` function and subscribe at least to:
+### Migration files
+All files in `supabase/migrations/` are production schema migrations applied in chronological order. The only non-migration file is `supabase/seeds/mock_curated.sql` (demo data only — do not run on production).
 
+---
+
+## Edge Functions
+
+Deploy all functions:
+```bash
+npx supabase functions deploy --project-ref <PROJECT_REF>
+```
+
+Required Supabase secrets (Dashboard → Settings → Edge Functions → Secrets):
+```
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_WEBHOOK_SECRET_CONNECT   # optional
+PLATFORM_FEE_PERCENT            # default 20
+```
+
+---
+
+## Stripe setup
+
+1. Host completes Stripe Connect onboarding via the profile screen.
+2. Guest pays by card (native Stripe Payment Sheet).
+3. Webhook at `stripe-webhook` Edge Function handles:
+   - `payment_intent.succeeded` → confirms booking + sends push notifications
+   - `payment_intent.payment_failed` → marks payment failed
+   - `charge.refunded` → marks payment refunded
+   - `account.updated` → refreshes host Stripe status
+
+Stripe webhook events to subscribe to:
 - `account.updated`
 - `payment_intent.succeeded`
 - `payment_intent.payment_failed`
+- `charge.refunded`
 
-Copy webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+---
 
-### 4) Expo/EAS public env
+## Analytics & monitoring
 
-Set `EXPO_PUBLIC_*` variables for builds (do not store keys in `eas.json`).
+- **PostHog** — product analytics (search funnels, booking conversion, session replay). Tracked events: `search_performed`, `empty_search_results`, `booking_flow_started`, `booking_completed`.
+- **Sentry** — crash and error tracking, initialized in `app/_layout.tsx`.
 
-## Quick verification flow
+Both require `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_SENTRY_DSN` in the environment.
 
-1. Host opens profile and activates payments (Stripe onboarding).
-2. Guest books and pays by card.
-3. Booking row stores `payment_intent_id` and status updates to `paid`.
-4. Webhook updates payment status for success/failure events.
+---
 
 ## Notes
 
-- Card payments are intentionally disabled on web in current implementation.
-- Keep `.env` and credentials out of git.
-
-## Facebook Login setup (Supabase + Meta)
-
-Code support is already wired in:
-
-- `app/(auth)/sign-in.tsx`
-- `app/(auth)/sign-up.tsx`
-- `app/auth-callback.tsx`
-
-To enable Facebook auth end-to-end:
-
-1. Create a Meta app (Meta for Developers) and add **Facebook Login** product.
-2. Copy `App ID` and `App Secret`.
-3. In Supabase Dashboard -> Auth -> Providers -> Facebook:
-   - Enable provider
-   - Paste `App ID` and `App Secret`
-   - Copy the Supabase callback URL shown there.
-4. In Meta Dashboard -> Facebook Login -> Settings:
-   - Add Supabase callback URL to **Valid OAuth Redirect URIs**.
-5. In Supabase Auth URL config, ensure your app redirect URL(s) are allowed (including deep-link callback path).
-6. Test from app:
-   - Tap `Continue with Facebook`
-   - Complete OAuth
-   - Verify redirect to guest home and session persisted.
-
-
-
-
+- Card payments are disabled on web (Stripe Payment Sheet is native only).
+- `.env` and all secret keys must never be committed to git.
+- `eas.json` contains only public/publishable keys (Supabase anon key, Stripe publishable key) — no secrets.

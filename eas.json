@@ -8,21 +8,37 @@
       "developmentClient": true,
       "distribution": "internal"
     },
-    "preview": {
+    "production": {
       "distribution": "internal",
-      "channel": "preview",
+      "channel": "production",
       "android": {
         "buildType": "apk"
       },
       "env": {
+        "APP_VARIANT": "production",
         "EXPO_PUBLIC_SUPABASE_URL": "https://vphdaahrnszfuoswbpwj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_aobQESyj_uibmqsCEfcp-g_pfvhXjXm",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCDJ55VRM0QxO1RSb3YDrFk4AryPy2iA9c",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TI8ovAiH4yiAzhsiKixk2LeENJRb0by0NQSpGZPeSfYJyFvShpO0bnQUjwQ0Ig70BQvOxFHjoqFxbvKgSOmfEIS00vAXsEI1g"
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TI8ovAiH4yiAzhsiKixk2LeENJRb0by0NQSpGZPeSfYJyFvShpO0bnQUjwQ0Ig70BQvOxFHjoqFxbvKgSOmfEIS00vAXsEI1g",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_pwJ7uLRRbwFx8G4nYj3HzAHidUUhXn56kddZsP5NWEVx",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://4c0410b82100630e966bf9d74c6969f3@o4511870501847040.ingest.de.sentry.io/4511870514692176"
       }
     },
-    "production": {
-      "autoIncrement": true
+    "demo": {
+      "distribution": "internal",
+      "channel": "demo",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "demo",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vxazvqozhewrziustdyg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_uB8XMoCL98XU_L7IdrraJg_YseAbkWe",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCDJ55VRM0QxO1RSb3YDrFk4AryPy2iA9c",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TI8ovAiH4yiAzhsiKixk2LeENJRb0by0NQSpGZPeSfYJyFvShpO0bnQUjwQ0Ig70BQvOxFHjoqFxbvKgSOmfEIS00vAXsEI1g",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_pwJ7uLRRbwFx8G4nYj3HzAHidUUhXn56kddZsP5NWEVx",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://4c0410b82100630e966bf9d74c6969f3@o4511870501847040.ingest.de.sentry.io/4511870514692176"
+      }
     }
   },
   "submit": {
