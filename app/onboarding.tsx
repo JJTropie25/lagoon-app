@@ -25,23 +25,23 @@ function makeStyles(c: ThemeColors) {
       gap: 14,
     },
     title: {
-      color: c.surface,
+      color: c.textPrimary,
       fontSize: 22,
       fontWeight: "600",
     },
     subtitle: {
-      color: c.surface,
+      color: c.textPrimary,
       textAlign: "center",
       fontSize: 14,
     },
     cardBody: {
-      color: c.surface,
+      color: c.textPrimary,
       marginBottom: 10,
       lineHeight: 20,
     },
     sectionTitle: {
       marginTop: 10,
-      color: c.surface,
+      color: c.textPrimary,
       fontWeight: "600",
     },
     checkboxRow: {
@@ -54,7 +54,7 @@ function makeStyles(c: ThemeColors) {
       height: 20,
       borderRadius: 5,
       borderWidth: 2,
-      borderColor: c.surface,
+      borderColor: c.textPrimary,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -63,7 +63,7 @@ function makeStyles(c: ThemeColors) {
       borderColor: c.warmAccent,
     },
     checkboxLabel: {
-      color: c.surface,
+      color: c.textPrimary,
       fontWeight: "600",
     },
     footer: {

@@ -10,9 +10,12 @@ const isDemo = variant === "demo";
 
 const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const localGoogleServicesPath = path.join(__dirname, "google-services.json");
-const googleServicesFile =
-  process.env.GOOGLE_SERVICES_JSON ||
-  (fs.existsSync(localGoogleServicesPath) ? "./google-services.json" : undefined);
+// Firebase (Android push) is registered only for com.lagoon.app, so the demo
+// build skips it: its package name has no client in google-services.json.
+const googleServicesFile = isDemo
+  ? undefined
+  : process.env.GOOGLE_SERVICES_JSON ||
+    (fs.existsSync(localGoogleServicesPath) ? "./google-services.json" : undefined);
 
 const androidConfig = {
   ...expo.android,

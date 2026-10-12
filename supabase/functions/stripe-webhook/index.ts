@@ -129,12 +129,14 @@ serve(async (req) => {
   if (event.type === "payment_intent.succeeded") {
     const intent = event.data.object;
     if (intent?.id) {
-      // Update booking status and payment_status
-      const { data: booking } = await adminClient
+      // Update booking status and payment_status. A multi-slot purchase creates
+      // several bookings sharing one payment intent; notify once, for the earliest.
+      const { data: intentBookings } = await adminClient
         .from("bookings")
         .select("id, guest_id, service_id, slot_start")
         .eq("payment_intent_id", intent.id)
-        .maybeSingle();
+        .order("slot_start", { ascending: true });
+      const booking = intentBookings?.[0] ?? null;
 
       await adminClient
         .from("bookings")

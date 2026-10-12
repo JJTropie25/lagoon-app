@@ -511,23 +511,13 @@ export default function ServiceDetails() {
             .eq("service_id", serviceId)
             .gte("slot_start", nowIso)
             .order("slot_start", { ascending: true }),
-          // Try the public booked_slot_times view first; fall back to own bookings via RLS
+          // Public view of taken slots across all guests (bookings themselves are private)
           (sb as any)
             .from("booked_slot_times")
             .select("slot_start")
             .eq("service_id", serviceId)
             .gte("slot_start", nowIso)
-            .then((r: any) => (r.data ?? []) as { slot_start: string }[])
-            .catch(() =>
-              sb
-                .from("bookings")
-                .select("slot_start")
-                .eq("service_id", serviceId)
-                .not("status", "in", '("cancelled_by_guest","cancelled_by_host")')
-                .gte("slot_start", nowIso)
-                .then((r: any) => r.data ?? [])
-                .catch(() => [] as { slot_start: string }[])
-            ),
+            .then((r: any) => (r.data ?? []) as { slot_start: string }[]),
         ]);
         if (!isMounted) return;
         const booked = new Set<string>((bookedSlotStarts as { slot_start: string }[]).map((b) => b.slot_start));

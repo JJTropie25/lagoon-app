@@ -1,4 +1,4 @@
-import Slider from "@react-native-community/slider/dist/Slider";
+import Slider from "@react-native-community/slider";
 import { StyleSheet } from "react-native";
 
 export default function UISlider(props: any) {

@@ -13,6 +13,14 @@ import { useAppDialog } from "../../../components/AppDialogProvider";
 import { useFocusEffect } from "@react-navigation/native";
 import { ensureHostForUser, resolveHostForUser } from "../../../lib/host";
 import TabTopNotch from "../../../components/TabTopNotch";
+import Constants from "expo-constants";
+
+const DB_LABELS: Record<string, string> = {
+  vphdaahrnszfuoswbpwj: "production DB",
+  vxazvqozhewrziustdyg: "demo DB",
+};
+const dbRef = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").replace(/^https?:\/\//, "").split(".")[0];
+const ENV_LABEL = `${Constants.expoConfig?.name ?? "Lagoon"} ${Constants.expoConfig?.version ?? ""} · ${DB_LABELS[dbRef] ?? (dbRef || "no DB")}`;
 
 const TEAL = "#4F9B9B";
 
@@ -319,6 +327,10 @@ export default function Profile() {
           <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
         </Pressable>
 
+        {/* Which build / database this is, to tell demo and production apart */}
+        <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: "center", marginTop: 16 }}>
+          {ENV_LABEL}
+        </Text>
       </ScrollView>
 
       <View style={[styles.bottomSection, { paddingBottom: 16 }]}>

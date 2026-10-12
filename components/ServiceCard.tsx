@@ -1,6 +1,6 @@
 import { useTheme } from "../lib/theme-context";
 import { type ThemeColors } from "../lib/theme";
-import { ServiceAmenities } from "../lib/services";
+import { ServiceAmenities, type Service } from "../lib/services";
 import { toDistanceLabel } from "../lib/services";
 import { useI18n } from "../lib/i18n";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -35,7 +35,7 @@ type ServiceCardProps = {
   location: string;
   imageSource: ImageSourcePropType;
   meta?: string;
-  category?: "rest" | "shower" | "storage";
+  category?: Service["category"];
   categoryIconName?: string;
   distanceLabel?: string;
   rating?: number | null;

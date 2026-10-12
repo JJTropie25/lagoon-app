@@ -210,8 +210,7 @@ export default function PaymentsScreen() {
             }))
           );
           setLoading(false);
-        })
-        .catch(() => { if (mounted) setLoading(false); });
+        }, () => { if (mounted) setLoading(false); });
       return () => { mounted = false; };
     }, [user?.id])
   );

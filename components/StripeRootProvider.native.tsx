@@ -14,7 +14,7 @@ export default function StripeRootProvider({ children }: Props) {
       publishableKey={stripePublishableKey}
       merchantIdentifier="merchant.com.lagoon"
     >
-      {children}
+      <>{children}</>
     </StripeProvider>
   );
 }

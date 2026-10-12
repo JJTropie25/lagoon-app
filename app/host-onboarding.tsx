@@ -17,12 +17,12 @@ function makeStyles(c: ThemeColors) {
       gap: 12,
     },
     title: {
-      color: c.surface,
+      color: c.textPrimary,
       fontSize: 22,
       fontWeight: "600",
     },
     body: {
-      color: c.surface,
+      color: c.textPrimary,
       textAlign: "center",
     },
     button: {

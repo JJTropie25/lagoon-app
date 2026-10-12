@@ -51,6 +51,11 @@ INSERT INTO public.hosts (id, display_name) VALUES
   ('b0100000-0000-0000-0000-000000000009'::uuid, 'Lagoon Bari')
 ON CONFLICT (id) DO NOTHING;
 
+-- Guests only see services of VERIFIED hosts.
+UPDATE public.hosts
+SET verification_status = 'VERIFIED', onboarding_complete = true
+WHERE id::text LIKE 'b0100000-0000-0000-0000-%';
+
 -- ============================================================
 -- 3. SERVICES
 -- columns: title, category, price_eur, location, city, region,

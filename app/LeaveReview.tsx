@@ -46,7 +46,7 @@ function makeStyles(c: ThemeColors) {
       fontSize: 20,
       fontWeight: "700",
       fontFamily: "Baloo2_700Bold",
-      color: c.surface,
+      color: c.textPrimary,
       marginBottom: 20,
     },
     card: {

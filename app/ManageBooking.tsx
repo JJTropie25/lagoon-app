@@ -304,41 +304,16 @@ export default function ManageBooking() {
     const loadHostPhone = async () => {
       const sb = supabase;
       if (!sb) return;
-      const { data: bookingRow } = await sb
-        .from("bookings")
-        .select("service_id")
-        .eq("id", bookingId)
-        .maybeSingle();
-      if (!isMounted || !bookingRow?.service_id) return;
-      const { data: serviceRow } = await sb
-        .from("services")
-        .select("host_id")
-        .eq("id", bookingRow.service_id)
-        .maybeSingle();
-      if (!isMounted || !serviceRow?.host_id) return;
-      const { data: hostRow } = await sb
-        .from("hosts")
-        .select("guest_id, phone_country_code, phone_number")
-        .eq("id", serviceRow.host_id)
-        .maybeSingle();
+      // Host rows are private; this RPC returns the phone only to the booking's guest.
+      const { data } = await (sb as any).rpc("get_host_contact_for_booking", {
+        p_booking_id: bookingId,
+      });
       if (!isMounted) return;
-      if (hostRow?.phone_number) {
-        const compact = `${hostRow.phone_country_code ?? ""}${hostRow.phone_number}`.replace(/[^\d+]/g, "");
-        if (compact) { setHostPhone(compact); return; }
-      }
-      if (!hostRow?.guest_id) return;
-      const { data: profileRow } = await sb
-        .from("profiles")
-        .select("phone_country_code, phone_number")
-        .eq("id", hostRow.guest_id)
-        .maybeSingle();
-      if (!isMounted) return;
-      if (profileRow?.phone_number) {
-        const compact = `${profileRow.phone_country_code ?? ""}${profileRow.phone_number}`.replace(/[^\d+]/g, "");
-        setHostPhone(compact || null);
-      } else {
-        setHostPhone(null);
-      }
+      const row = Array.isArray(data) ? data[0] : data;
+      const compact = row?.phone_number
+        ? `${row.phone_country_code ?? ""}${row.phone_number}`.replace(/[^\d+]/g, "")
+        : "";
+      setHostPhone(compact || null);
     };
     loadHostPhone();
     return () => { isMounted = false; };

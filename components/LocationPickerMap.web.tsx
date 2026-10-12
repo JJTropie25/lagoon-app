@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+
 import { StyleSheet, View } from "react-native";
+
+// Leaflet is loaded from a CDN at runtime (window.L); no type package is installed.
+declare namespace L {
+  type Map = any;
+  type Marker = any;
+}
 
 type Props = {
   latitude: number;

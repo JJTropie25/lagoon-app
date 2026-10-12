@@ -18,7 +18,7 @@ function makeStyles(c: ThemeColors) {
       gap: 12,
     },
     message: {
-      color: c.surface,
+      color: c.textPrimary,
       fontWeight: "600",
     },
   });
@@ -47,6 +47,12 @@ export default function AuthCallback() {
       }
 
       const handleUrl = async (urlString: string) => {
+        // Password-reset links carry type=recovery: after signing in, ask for a new password.
+        const isRecovery = /[?#&]type=recovery/.test(urlString);
+        const done = () =>
+          isRecovery
+            ? router.replace({ pathname: "/(tabs)/profile/Edit", params: { field: "password" } })
+            : router.replace("/(tabs)/guest");
         const errorDescription = (() => {
           const parsed = Linking.parse(urlString);
           const err =
@@ -68,13 +74,13 @@ export default function AuthCallback() {
           if (error) {
             const { data } = await sb.auth.getSession();
             if (data.session) {
-              router.replace("/(tabs)/guest");
+              done();
               return;
             }
             setMessage(error.message);
             return;
           }
-          router.replace("/(tabs)/guest");
+          done();
           return;
         }
 
@@ -91,7 +97,7 @@ export default function AuthCallback() {
             setMessage(error.message);
             return;
           }
-          router.replace("/(tabs)/guest");
+          done();
           return;
         }
 

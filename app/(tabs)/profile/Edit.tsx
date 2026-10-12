@@ -327,7 +327,7 @@ function makeStyles(c: ThemeColors) {
 
 export default function EditProfile() {
   const router = useRouter();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, field } = useLocalSearchParams<{ returnTo?: string; field?: string }>();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const dialog = useAppDialog();
@@ -354,6 +354,11 @@ export default function EditProfile() {
   const [editSaving, setEditSaving] = useState(false);
 
   const [prefixOpen, setPrefixOpen] = useState(false);
+
+  // Arriving from a password-reset email: open the new-password field directly.
+  useEffect(() => {
+    if (field === "password") { setEditValue(""); setEditingField("password"); }
+  }, [field]);
 
   useEffect(() => {
     if (!user) return;

@@ -38,6 +38,7 @@ export function useAuthState(): AuthState {
 
     const hydrateSession = async () => {
       // Hydrate once at boot so screens can render immediately with cached auth state.
+      if (!supabase) return;
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
       setSession(data.session ?? null);

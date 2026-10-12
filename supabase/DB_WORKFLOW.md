@@ -1,67 +1,56 @@
 # Database Workflow
 
-This project now keeps SQL in ordered folders:
+Two Supabase projects share the same schema:
 
-- `migrations/`: schema and policy changes (run in filename order)
-- `seeds/`: optional mock/sample data
-- `host_roma_link_my_user.sql`: local/dev utility to bind a real auth user to Host Roma
+| Project | Ref | Use |
+|---|---|---|
+| `Jungle` | `vphdaahrnszfuoswbpwj` | **production**: real users, no mock data |
+| `lagoon-demo` | `vxazvqozhewrziustdyg` | **demo**: curated mock data for screenshots/demos |
 
-## 1) Existing database (already running)
+## Layout
 
-Do **not** rerun everything. Run only migrations that are new for your DB state.
+- `migrations/`: schema and policy changes, applied in filename order to **both** projects
+- `seeds/`: mock data, **demo only** (`mock_curated.sql` is the one to use)
+- `functions/`: edge functions (Stripe, push, refunds), deployed to both projects
 
-For your current state, the important one to run now is:
+## Applying migrations
 
-- `migrations/20260304200500_profiles_update_policy.sql`
-- `migrations/20260304200600_profiles_phone_columns.sql`
-- `migrations/20260304200700_hosts_phone_columns.sql`
-- `migrations/20260304200800_services_price_decimal.sql`
+Migrations are applied with the Supabase CLI, one project at a time:
 
-If storage upload/policies are not yet applied in your project, also run:
+```bash
+npx supabase link --project-ref vxazvqozhewrziustdyg   # demo first
+npx supabase db push --linked
+npx supabase link --project-ref vphdaahrnszfuoswbpwj   # then production
+npx supabase db push --linked
+```
 
-- `migrations/20260304200400_storage_avatars_policies.sql`
+`npx supabase migration list --linked` shows what each project has applied.
 
-If host slot RLS is not yet applied, also run:
+Migrations up to `20260807100000` were originally pasted into the SQL editor by hand; on 2026-10-04 they were recorded as applied
+in both projects (`supabase migration repair --status applied ...`) so `db push` only sends newer files.
 
-- `migrations/20260304200300_service_slots_host_policies.sql`
+## Edge functions
 
-## 2) Fresh database from zero (clean rebuild)
+```bash
+npx supabase functions deploy --project-ref <REF> --use-api
+```
 
-Run, in order:
+## Rules for new changes
 
-1. `migrations/20260304200100_schema_base.sql`
-2. `migrations/20260304200200_schema_v2.sql`
-3. `migrations/20260304200300_service_slots_host_policies.sql`
-4. `migrations/20260304200400_storage_avatars_policies.sql`
-5. `migrations/20260304200500_profiles_update_policy.sql`
+1. Add a **new** file in `migrations/` with a higher timestamp, never edit an applied one.
+2. Keep it idempotent (`if not exists`, `drop policy if exists`, ...).
+3. Push to demo, test, then push to production.
 
-Optional mock data:
+## Admin tasks (Dashboard → Table Editor)
 
-1. `seeds/mock_core.sql`
-2. `seeds/mock_hosts_and_slots.sql`
-3. `seeds/mock_hosts_phone.sql`
+- **Verify a host**: set `hosts.verification_status` to `VERIFIED`. Only verified hosts' listings are visible to guests,
+  and the app cannot change this field itself (trigger `hosts_protect_admin_fields`).
+- **Reject a host**: set it to `REJECTED`.
 
-Optional host-user link for local testing:
+## Access rules (summary)
 
-- `host_roma_link_my_user.sql` (edit UUID first)
-
-## 3) Rule for future changes
-
-When you change DB schema/policies:
-
-1. Add a **new** file in `migrations/` with a higher timestamp.
-2. Keep it idempotent when possible (`if not exists`, `add column if not exists`, etc.).
-3. Never edit old migrations after they are shared/applied.
-
-## 4) Portability outside Supabase
-
-Not all SQL is portable:
-
-- Supabase-specific: `auth.uid()`, `auth.users`, `storage.*` policies.
-- Mostly portable PostgreSQL domain schema: core table design and constraints.
-
-If you want easy migration to a non-Supabase stack later:
-
-1. Keep business tables in portable SQL files.
-2. Keep auth/storage policies in provider-specific migration files.
-3. Treat provider-specific files as adapters.
+- `hosts`: each user sees/edits only their own row; guests get a host's phone only through
+  `get_host_contact_for_booking()` for their own bookings.
+- `services`: visible when the host is `VERIFIED` (or to the owning host).
+- `bookings`: guests see/create their own; hosts see bookings for their listings and can only check guests in/out.
+  Payment status changes and cancellations go through edge functions.

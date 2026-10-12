@@ -292,6 +292,7 @@ export default function Payment() {
     let paymentIntentId: string | null = null;
     let amountCentsPerSlot: number | null = null;
     let platformFeeCentsPerSlot: number | null = null;
+    let paymentSheetReady = false;
 
     if (method === "card") {
       if (!stripe) {
@@ -321,12 +322,7 @@ export default function Payment() {
         await dialog.alert(t("payment.title"), init.error.message);
         return;
       }
-      const present = await stripe.presentPaymentSheet();
-      if (present.error) {
-        setProcessing(false);
-        await dialog.alert(t("payment.title"), present.error.message);
-        return;
-      }
+      paymentSheetReady = true;
       paymentIntentId = paymentIntent.payment_intent_id ?? null;
       amountCentsPerSlot = paymentIntent.amount_cents != null
         ? Math.round(paymentIntent.amount_cents / slotCount)
@@ -336,8 +332,16 @@ export default function Payment() {
         : null;
     }
 
+    // Card bookings are inserted as pending_payment *before* the payment sheet is
+    // shown, so the Stripe webhook always finds them (and the slot is held while
+    // the guest pays). If the payment doesn't go through they are removed again.
     let firstBookingId: string | null = null;
     let firstQrToken: string | null = null;
+    const insertedIds: string[] = [];
+    const discardPendingBookings = async () => {
+      if (insertedIds.length === 0) return;
+      await supabase!.from("bookings").delete().in("id", insertedIds);
+    };
 
     for (let i = 0; i < parsedSlots.length; i++) {
       const slot = parsedSlots[i];
@@ -362,13 +366,25 @@ export default function Payment() {
         .single();
 
       if (error) {
+        await discardPendingBookings();
         setProcessing(false);
         await dialog.alert(t("payment.title"), error.message);
         return;
       }
+      if (data) insertedIds.push(data.id);
       if (data && !firstBookingId) {
         firstBookingId = data.id;
         firstQrToken = slotQrToken;
+      }
+    }
+
+    if (paymentSheetReady && stripe) {
+      const present = await stripe.presentPaymentSheet();
+      if (present.error) {
+        await discardPendingBookings();
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), present.error.message);
+        return;
       }
     }
 

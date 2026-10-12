@@ -8,9 +8,9 @@ export default function HostTabsLayout() {
 
   return (
     <Tabs
+      detachInactiveScreens
       screenOptions={{
         headerShown: false,
-        detachInactiveScreens: true,
         sceneStyle: { backgroundColor: colors.screenBackground },
         tabBarStyle: {
           backgroundColor: colors.screenBackground,

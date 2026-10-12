@@ -45,3 +45,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# local tool state
+.claude/
+supabase/.temp/

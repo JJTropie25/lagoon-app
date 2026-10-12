@@ -41,7 +41,7 @@ async function photonAutocomplete(query: string, limit: number): Promise<PlaceSu
   return payload.features
     .map((f) => {
       const [lon, lat] = f.geometry?.coordinates ?? [];
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      if (typeof lat !== "number" || typeof lon !== "number" || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
       const p = f.properties ?? {};
       // Build a readable label from the available fields
       const parts: string[] = [];

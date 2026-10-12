@@ -28,10 +28,10 @@ function makeStyles(c: ThemeColors) {
     webTitle: {
       fontSize: 20,
       fontWeight: "600",
-      color: c.surface,
+      color: c.textPrimary,
     },
     webText: {
-      color: c.surface,
+      color: c.textPrimary,
       textAlign: "center",
     },
     webButton: {

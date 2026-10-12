@@ -203,7 +203,6 @@ function makeStyles(c: ThemeColors) {
       fontWeight: "700",
       fontSize: 15,
     },
-    btnDisabled: { opacity: 0.55 },
     btnSecondaryText: {
       color: "#fff",
       fontWeight: "700",
@@ -506,10 +505,16 @@ export default function HostReservationDetail() {
                 });
                 if (!ok || !supabase || !bookingId) return;
                 setCompleting(true);
-                await supabase
+                const { data: updated, error } = await supabase
                   .from("bookings")
                   .update({ status: "completed", checked_out_at: new Date().toISOString() })
-                  .eq("id", bookingId);
+                  .eq("id", bookingId)
+                  .select("id");
+                if (error || !updated?.length) {
+                  setCompleting(false);
+                  await dialog.alert("Completa prenotazione", error?.message ?? "Aggiornamento non riuscito.");
+                  return;
+                }
                 setBookingStatus("completed");
                 setCompleting(false);
                 router.replace({

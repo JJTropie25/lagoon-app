@@ -45,10 +45,16 @@ export default function HostScanQr() {
       return;
     }
     if (supabase && bookingId) {
-      await supabase
+      const { data: updated, error } = await supabase
         .from("bookings")
         .update({ checked_in_at: new Date().toISOString(), status: "checked_in" })
-        .eq("id", bookingId);
+        .eq("id", bookingId)
+        .select("id");
+      if (error || !updated?.length) {
+        await dialog.alert("Scan QR", error?.message ?? "Check-in non riuscito.");
+        setScanLocked(false);
+        return;
+      }
     }
     router.replace({ pathname: "/(host)/check-in-confirmed", params: { bookingId, mode: "checkin" } });
   };

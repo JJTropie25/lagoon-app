@@ -7,10 +7,10 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   return (
     <Tabs
+      detachInactiveScreens
       key={language}
       screenOptions={{
         headerShown: false,
-        detachInactiveScreens: true,
         sceneStyle: { backgroundColor: colors.screenBackground },
         tabBarStyle: {
           backgroundColor: colors.screenBackground,

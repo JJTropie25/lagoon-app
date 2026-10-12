@@ -19,6 +19,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
+import { useEnabledOAuthProviders } from "../../lib/authProviders";
+import PasswordInput from "../../components/PasswordInput";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -153,6 +155,7 @@ export default function SignUp() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [prefixOpen, setPrefixOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const oauthEnabled = useEnabledOAuthProviders();
   const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "apple" | null>(null);
   const showApple = Platform.OS === "ios";
 
@@ -181,6 +184,8 @@ export default function SignUp() {
       email: email.trim(),
       password,
       options: {
+        // The confirmation link opens the app (lagoon://auth-callback), which signs the user in.
+        emailRedirectTo: Linking.createURL("/auth-callback"),
         data: {
           username: username.trim(),
           phone_country_code: phonePrefix,
@@ -203,6 +208,11 @@ export default function SignUp() {
         { id: data.user.id, phone_country_code: phonePrefix, phone_number: phoneNumber.trim() },
         { onConflict: "id" }
       );
+    }
+    // With "Confirm email" off (demo) Supabase returns a session right away.
+    if (data?.session) {
+      router.replace("/(tabs)/guest");
+      return;
     }
     await dialog.alert(t("auth.checkEmail"), t("auth.checkEmailDetail"));
     router.replace("/(auth)/sign-in");
@@ -268,29 +278,37 @@ export default function SignUp() {
       <Text style={styles.title}>{t("auth.signUpTitle")}</Text>
       <Text style={styles.subtitle}>{t("auth.signUpSubtitle")}</Text>
 
+      {oauthEnabled.google || oauthEnabled.facebook || (showApple && oauthEnabled.apple) ? (
+      <>
       <View style={styles.socialRow}>
-        {showApple ? (
+        {showApple && oauthEnabled.apple ? (
           <Pressable style={[styles.socialButton, oauthLoading === "apple" && styles.disabled]} onPress={() => handleOAuth("apple")} disabled={oauthLoading === "apple"}>
             <MaterialCommunityIcons name="apple" size={18} color={colors.textPrimary} />
             <Text style={styles.socialText}>{t("auth.continueWithApple")}</Text>
           </Pressable>
         ) : null}
+        {oauthEnabled.google ? (
         <Pressable style={[styles.socialButton, oauthLoading === "google" && styles.disabled]} onPress={() => handleOAuth("google")} disabled={oauthLoading === "google"}>
           <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
           <Text style={styles.socialText}>{t("auth.continueWithGoogle")}</Text>
         </Pressable>
+        ) : null}
+        {oauthEnabled.facebook ? (
         <Pressable style={[styles.socialButton, oauthLoading === "facebook" && styles.disabled]} onPress={() => handleOAuth("facebook")} disabled={oauthLoading === "facebook"}>
           <MaterialCommunityIcons name="facebook" size={18} color={colors.textPrimary} />
           <Text style={styles.socialText}>{t("auth.continueWithFacebook")}</Text>
         </Pressable>
+        ) : null}
       </View>
 
       <Text style={styles.orText}>{t("auth.orContinue")}</Text>
+      </>
+      ) : null}
 
       <View style={styles.form}>
         <TextInput style={styles.input} placeholder={t("auth.username")} placeholderTextColor="#4F9B9B" autoCapitalize="none" value={username} onChangeText={setUsername} />
         <TextInput style={styles.input} placeholder={t("auth.email")} placeholderTextColor="#4F9B9B" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-        <TextInput style={styles.input} placeholder={t("auth.password")} placeholderTextColor="#4F9B9B" secureTextEntry value={password} onChangeText={setPassword} />
+        <PasswordInput style={styles.input} placeholder={t("auth.password")} placeholderTextColor="#4F9B9B" value={password} onChangeText={setPassword} />
         <Text style={styles.phoneLabel}>{t("edit.phoneNumber")}</Text>
         <View style={styles.phoneRow}>
           <TouchableOpacity style={styles.prefixButton} onPress={() => setPrefixOpen(true)}>

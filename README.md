@@ -32,7 +32,9 @@ npm run env:demo        # demo DB (mock data) — default for development
 npm run env:production  # production DB (empty, real users)
 ```
 
-Or manually copy `.env.demo` / `.env.production` to `.env`. Required variables:
+Or manually copy `.env.demo` / `.env.prod` to `.env`.
+
+> Do not name an env file `.env.production`: Expo loads it automatically for every production bundle (including `eas update`), overriding `.env`. Required variables:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=

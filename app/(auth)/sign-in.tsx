@@ -19,6 +19,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
+import { useEnabledOAuthProviders } from "../../lib/authProviders";
+import PasswordInput from "../../components/PasswordInput";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -126,6 +128,7 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const oauthEnabled = useEnabledOAuthProviders();
   const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "apple" | null>(null);
   const showApple = Platform.OS === "ios";
 
@@ -175,7 +178,10 @@ export default function SignIn() {
       return;
     }
     setResettingPassword(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      // The email link reopens the app, which then asks for the new password.
+      redirectTo: Linking.createURL("/auth-callback"),
+    });
     setResettingPassword(false);
     if (error) { await dialog.alert(t("auth.resetPasswordTitle"), error.message); return; }
     await dialog.alert(t("auth.resetPasswordTitle"), t("auth.resetPasswordSent"));
@@ -251,24 +257,32 @@ export default function SignIn() {
         {isContinue ? "Devi essere connesso per usare questa funzione." : t("auth.signInSubtitle")}
       </Text>
 
+      {oauthEnabled.google || oauthEnabled.facebook || (showApple && oauthEnabled.apple) ? (
+      <>
       <View style={styles.socialRow}>
-        {showApple ? (
+        {showApple && oauthEnabled.apple ? (
           <Pressable style={[styles.socialButton, oauthLoading === "apple" && styles.disabled]} onPress={() => handleOAuth("apple")} disabled={oauthLoading === "apple"}>
             <MaterialCommunityIcons name="apple" size={18} color={colors.textPrimary} />
             <Text style={styles.socialText}>{t("auth.continueWithApple")}</Text>
           </Pressable>
         ) : null}
+        {oauthEnabled.google ? (
         <Pressable style={[styles.socialButton, oauthLoading === "google" && styles.disabled]} onPress={() => handleOAuth("google")} disabled={oauthLoading === "google"}>
           <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
           <Text style={styles.socialText}>{t("auth.continueWithGoogle")}</Text>
         </Pressable>
+        ) : null}
+        {oauthEnabled.facebook ? (
         <Pressable style={[styles.socialButton, oauthLoading === "facebook" && styles.disabled]} onPress={() => handleOAuth("facebook")} disabled={oauthLoading === "facebook"}>
           <MaterialCommunityIcons name="facebook" size={18} color={colors.textPrimary} />
           <Text style={styles.socialText}>{t("auth.continueWithFacebook")}</Text>
         </Pressable>
+        ) : null}
       </View>
 
       <Text style={styles.orText}>{t("auth.orContinue")}</Text>
+      </>
+      ) : null}
 
       <View style={styles.form}>
         <TextInput
@@ -280,11 +294,10 @@ export default function SignIn() {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
+        <PasswordInput
           style={styles.input}
           placeholder={t("auth.password")}
           placeholderTextColor="#4F9B9B"
-          secureTextEntry
           value={password}
           onChangeText={setPassword}
         />
