@@ -49,3 +49,4 @@ app-example
 # local tool state
 .claude/
 supabase/.temp/
+!.env.example
