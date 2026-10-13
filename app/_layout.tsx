@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Stack } from "expo-router";
 import { I18nProvider } from "../lib/i18n";
 import { useAuthState } from "../lib/auth";
+import { useAuthDeepLinks } from "../lib/authLinks";
 import { Platform, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppDialogProvider } from "../components/AppDialogProvider";
@@ -43,6 +44,7 @@ function AndroidNavBarSpacer({ children }: { children: React.ReactNode }) {
 
 function RootLayout() {
   useAuthState();
+  useAuthDeepLinks();
   const [fontsLoaded] = useFonts({
     ...MaterialCommunityIcons.font,
     Baloo2_700Bold,
